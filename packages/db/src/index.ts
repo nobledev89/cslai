@@ -17,6 +17,7 @@ export type {
   Run,
   RunStep,
   ErrorLog,
+  Prisma,
 } from '@prisma/client';
 
 // Re-export Prisma enums (values + types)

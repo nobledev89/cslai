@@ -17,7 +17,7 @@ export class RunsController {
     @TenantId() tenantId: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
-  ) {
+  ): Promise<any[]> {
     return this.runsService.findAll(
       tenantId,
       skip ? parseInt(skip, 10) : 0,
@@ -27,7 +27,7 @@ export class RunsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a run with all steps and errors' })
-  findOne(@TenantId() tenantId: string, @Param('id') id: string) {
+  findOne(@TenantId() tenantId: string, @Param('id') id: string): Promise<any> {
     return this.runsService.findOne(tenantId, id);
   }
 }

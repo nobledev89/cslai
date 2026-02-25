@@ -21,6 +21,7 @@ export class WooCommerceIntegration implements IIntegration {
   }
 
   async runEnrichment(query: string): Promise<NormalizedResult> {
+    const startTime = Date.now();
     try {
       const url = `${this.config.baseUrl}/wp-json/${this.config.apiVersion}/orders?search=${encodeURIComponent(query)}&per_page=10`;
       const res = await fetch(url, {
@@ -28,7 +29,9 @@ export class WooCommerceIntegration implements IIntegration {
         signal: AbortSignal.timeout(this.config.timeoutMs),
       });
 
-      if (!res.ok) return errResult(`WooCommerce request failed: ${res.status}`);
+      const durationMs = Date.now() - startTime;
+
+      if (!res.ok) return errResult('WOOCOMMERCE', `WooCommerce request failed: ${res.status}`, { durationMs });
 
       const orders = (await res.json()) as Array<{
         id: number;
@@ -40,14 +43,15 @@ export class WooCommerceIntegration implements IIntegration {
 
       const items = orders.map((o) => ({
         label: `Order #${o.id} — ${o.billing.first_name} ${o.billing.last_name}`,
-        value: `Status: ${o.status}, Total: ${o.total}, Email: ${o.billing.email}, Created: ${o.date_created}`,
-        source: 'woocommerce' as const,
-        metadata: { orderId: o.id, status: o.status, total: o.total },
+        summary: `Status: ${o.status}, Total: ${o.total}, Email: ${o.billing.email}`,
+        data: { orderId: o.id, status: o.status, total: o.total, email: o.billing.email },
+        timestamp: o.date_created,
       }));
 
-      return okResult(items);
+      return okResult('WOOCOMMERCE', items, { durationMs });
     } catch (err: any) {
-      return errResult(err?.message ?? 'Unknown WooCommerce error');
+      const durationMs = Date.now() - startTime;
+      return errResult('WOOCOMMERCE', err?.message ?? 'Unknown WooCommerce error', { durationMs });
     }
   }
 }

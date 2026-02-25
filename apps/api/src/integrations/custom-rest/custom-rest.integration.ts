@@ -21,6 +21,7 @@ export class CustomRestIntegration implements IIntegration {
   }
 
   async runEnrichment(query: string): Promise<NormalizedResult> {
+    const startTime = Date.now();
     try {
       let url = this.config.baseUrl;
       let body: string | undefined;
@@ -42,22 +43,24 @@ export class CustomRestIntegration implements IIntegration {
         signal: AbortSignal.timeout(this.config.timeoutMs),
       });
 
-      if (!res.ok) return errResult(`Custom REST request failed: ${res.status}`);
+      const durationMs = Date.now() - startTime;
+
+      if (!res.ok) return errResult('CUSTOM_REST', `Custom REST request failed: ${res.status}`, { durationMs });
 
       const responseData = await res.json();
       const results = getByPath(responseData, this.config.resultsJsonPath);
-      if (!Array.isArray(results)) return errResult('resultsJsonPath did not return an array');
+      if (!Array.isArray(results)) return errResult('CUSTOM_REST', 'resultsJsonPath did not return an array', { durationMs });
 
       const items = results.map((item: unknown) => ({
         label: String(getByPath(item, this.config.labelJsonPath) ?? JSON.stringify(item)),
-        value: JSON.stringify(item),
-        source: 'custom_rest' as const,
-        metadata: { raw: item },
+        summary: JSON.stringify(item),
+        data: { raw: item },
       }));
 
-      return okResult(items);
+      return okResult('CUSTOM_REST', items, { durationMs });
     } catch (err: any) {
-      return errResult(err?.message ?? 'Unknown Custom REST error');
+      const durationMs = Date.now() - startTime;
+      return errResult('CUSTOM_REST', err?.message ?? 'Unknown Custom REST error', { durationMs });
     }
   }
 }

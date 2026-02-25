@@ -27,7 +27,7 @@ export class MemoryController {
 
   @Get(':threadKey')
   @ApiOperation({ summary: 'Get a thread memory with messages' })
-  getThread(@TenantId() tenantId: string, @Param('threadKey') threadKey: string) {
+  getThread(@TenantId() tenantId: string, @Param('threadKey') threadKey: string): Promise<any> {
     return this.memoryService.getThread(tenantId, threadKey);
   }
 }

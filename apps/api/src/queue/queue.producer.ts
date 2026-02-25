@@ -28,7 +28,7 @@ export class QueueProducer {
 
   async enqueueEnrichment(payload: EnrichmentJobPayload): Promise<string> {
     const job = await this.queue.add('enrich', payload, {
-      jobId: `${payload.tenantId}:${payload.slackThreadTs ?? Date.now()}`,
+      jobId: `${payload.tenantId}:${payload.slack?.threadTs ?? Date.now()}`,
     });
     this.logger.log(`Enqueued enrichment job ${job.id} for tenant ${payload.tenantId}`);
     return job.id ?? '';

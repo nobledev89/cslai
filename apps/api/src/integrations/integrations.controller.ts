@@ -22,13 +22,13 @@ export class IntegrationsController {
 
   @Get()
   @ApiOperation({ summary: 'List all integrations for the tenant' })
-  findAll(@TenantId() tenantId: string) {
+  findAll(@TenantId() tenantId: string): Promise<any[]> {
     return this.integrationsService.findAll(tenantId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single integration config' })
-  findOne(@TenantId() tenantId: string, @Param('id') id: string) {
+  findOne(@TenantId() tenantId: string, @Param('id') id: string): Promise<any> {
     return this.integrationsService.findOne(tenantId, id);
   }
 
@@ -37,7 +37,7 @@ export class IntegrationsController {
   create(
     @TenantId() tenantId: string,
     @Body() body: { type: any; name: string; config: Record<string, unknown> },
-  ) {
+  ): Promise<any> {
     return this.integrationsService.create(tenantId, body);
   }
 
@@ -47,7 +47,7 @@ export class IntegrationsController {
     @TenantId() tenantId: string,
     @Param('id') id: string,
     @Body() body: { name?: string; enabled?: boolean; config?: Record<string, unknown> },
-  ) {
+  ): Promise<any> {
     return this.integrationsService.update(tenantId, id, body);
   }
 

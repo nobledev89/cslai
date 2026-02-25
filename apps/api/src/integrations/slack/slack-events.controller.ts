@@ -92,12 +92,16 @@ export class SlackEventsController {
 
       await this.queueProducer.enqueueEnrichment({
         tenantId: team_id, // resolved to actual tenantId by worker
-        trigger: 'slack_mention',
-        slackTeamId: team_id,
-        slackChannelId: event.channel ?? '',
-        slackThreadTs: event.thread_ts ?? event.ts ?? '',
-        slackUserId: event.user ?? '',
-        query: event.text ?? '',
+        threadKey: `slack:${team_id}:${event.channel}:${event.thread_ts ?? event.ts}`,
+        userMessage: event.text ?? '',
+        slack: {
+          teamId: team_id,
+          channelId: event.channel ?? '',
+          threadTs: event.thread_ts ?? event.ts ?? '',
+          userId: event.user ?? '',
+          botUserId: '', // Will be resolved by worker
+        },
+        enqueuedAt: new Date().toISOString(),
       });
     }
 

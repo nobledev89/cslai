@@ -13,6 +13,7 @@ export class SlackIntegration implements IIntegration {
   }
 
   async runEnrichment(query: string): Promise<NormalizedResult> {
+    const startTime = Date.now();
     try {
       const res = await fetch(
         `https://slack.com/api/search.messages?query=${encodeURIComponent(query)}&count=${this.config.maxHistoryResults}`,
@@ -24,19 +25,21 @@ export class SlackIntegration implements IIntegration {
         error?: string;
       };
 
-      if (!data.ok) return errResult(`Slack search failed: ${data.error}`);
+      const durationMs = Date.now() - startTime;
+
+      if (!data.ok) return errResult('SLACK', `Slack search failed: ${data.error}`, { durationMs });
 
       const items = (data.messages?.matches ?? []).map((m) => ({
         label: `#${m.channel.name} @ ${new Date(parseFloat(m.ts) * 1000).toISOString()}`,
-        value: m.text,
+        summary: m.text,
+        data: { channel: m.channel.name, ts: m.ts },
         url: m.permalink,
-        source: 'slack' as const,
-        metadata: { channel: m.channel.name, ts: m.ts },
       }));
 
-      return okResult(items);
+      return okResult('SLACK', items, { durationMs });
     } catch (err: any) {
-      return errResult(err?.message ?? 'Unknown Slack error');
+      const durationMs = Date.now() - startTime;
+      return errResult('SLACK', err?.message ?? 'Unknown Slack error', { durationMs });
     }
   }
 }

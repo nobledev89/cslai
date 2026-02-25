@@ -11,8 +11,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-# Copy workspace manifests
-COPY package.json pnpm-workspace.yaml turbo.json tsconfig.json ./
+# Copy workspace manifests and lockfile
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.json ./
 COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
@@ -39,25 +39,22 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-# Copy workspace manifests for prod install
-COPY package.json pnpm-workspace.yaml ./
-COPY packages/db/package.json ./packages/db/
-COPY packages/shared/package.json ./packages/shared/
-COPY apps/api/package.json ./apps/api/
-
-# Install production deps only
-RUN pnpm install --frozen-lockfile --prod
-
-# Copy built artifacts
+# Copy ALL workspace files first (needed for proper workspace resolution)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.json ./
+COPY --from=builder /app/packages/db/package.json ./packages/db/package.json
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
-# Copy Prisma schema (needed at runtime for migrations)
-COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+# Install production deps (will create proper symlinks now that files are in place)
+RUN pnpm install --frozen-lockfile --prod
 
-# Copy generated Prisma client
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Copy only the generated Prisma client
+COPY --from=builder /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma ./node_modules/.prisma
 
 ENV NODE_ENV=production
 

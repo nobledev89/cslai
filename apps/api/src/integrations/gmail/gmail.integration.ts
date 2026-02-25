@@ -40,6 +40,7 @@ export class GmailIntegration implements IIntegration {
   }
 
   async runEnrichment(query: string): Promise<NormalizedResult> {
+    const startTime = Date.now();
     try {
       const token = await this.getAccessToken();
 
@@ -49,7 +50,9 @@ export class GmailIntegration implements IIntegration {
       );
 
       const listData = (await listRes.json()) as { messages?: Array<{ id: string }> };
-      if (!listData.messages?.length) return okResult([]);
+      const durationMs = Date.now() - startTime;
+      
+      if (!listData.messages?.length) return okResult('GMAIL', [], { durationMs });
 
       const items = await Promise.all(
         listData.messages.slice(0, this.config.maxResults).map(async (msg) => {
@@ -70,16 +73,17 @@ export class GmailIntegration implements IIntegration {
 
           return {
             label: subject,
-            value: `From: ${from}\nDate: ${date}\nSnippet: ${msgData.snippet}`,
-            source: 'gmail' as const,
-            metadata: { messageId: msg.id, from, date },
+            summary: `From: ${from}\nSnippet: ${msgData.snippet}`,
+            data: { messageId: msg.id, from, date },
+            timestamp: date,
           };
         }),
       );
 
-      return okResult(items);
+      return okResult('GMAIL', items, { durationMs: Date.now() - startTime });
     } catch (err: any) {
-      return errResult(err?.message ?? 'Unknown Gmail error');
+      const durationMs = Date.now() - startTime;
+      return errResult('GMAIL', err?.message ?? 'Unknown Gmail error', { durationMs });
     }
   }
 }

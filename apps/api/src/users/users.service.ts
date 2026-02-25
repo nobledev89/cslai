@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string): Promise<any[]> {
     return prisma.user.findMany({
       where: { memberships: { some: { tenantId } } },
       select: {
@@ -21,7 +21,7 @@ export class UsersService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string): Promise<any> {
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -38,7 +38,7 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto): Promise<any> {
     await this.findOne(id);
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name;

@@ -4,7 +4,7 @@
 # =============================================================================
 
 # ─── Admin UI ─────────────────────────────────────────────────────────────────
-ai.corporatespec.com {
+cslai.corporatespec.com {
     # Proxy to Next.js web app
     reverse_proxy web:3000
 
@@ -26,7 +26,7 @@ ai.corporatespec.com {
 }
 
 # ─── API ──────────────────────────────────────────────────────────────────────
-api.ai.corporatespec.com {
+api.cslai.corporatespec.com {
     # Proxy to NestJS API
     reverse_proxy api:3001
 

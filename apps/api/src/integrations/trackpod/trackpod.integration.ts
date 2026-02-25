@@ -19,9 +19,9 @@ export class TrackpodIntegration implements IIntegration {
   async runEnrichment(_query: string): Promise<NormalizedResult> {
     // Feature-flagged: return empty until implementation is complete
     if (!this.config.enabled) {
-      return okResult([]);
+      return okResult('TRACKPOD', []);
     }
     // TODO: implement when Trackpod API endpoints are confirmed
-    return okResult([]);
+    return okResult('TRACKPOD', []);
   }
 }

@@ -11,7 +11,7 @@ import { RegistryService } from './registry.service';
 export class IntegrationsService {
   constructor(private readonly registry: RegistryService) {}
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string): Promise<any[]> {
     return prisma.integrationConfig.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -28,7 +28,7 @@ export class IntegrationsService {
     });
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(tenantId: string, id: string): Promise<any> {
     const config = await prisma.integrationConfig.findFirst({
       where: { id, tenantId },
     });
@@ -36,7 +36,7 @@ export class IntegrationsService {
     return config;
   }
 
-  async create(tenantId: string, body: { type: IntegrationType; name: string; config: Record<string, unknown> }) {
+  async create(tenantId: string, body: { type: IntegrationType; name: string; config: Record<string, unknown> }): Promise<any> {
     const configEnc = JSON.stringify(
       await import('@company-intel/db').then((m) =>
         m.encryptObject(body.config),
@@ -51,7 +51,7 @@ export class IntegrationsService {
     tenantId: string,
     id: string,
     body: { name?: string; enabled?: boolean; config?: Record<string, unknown> },
-  ) {
+  ): Promise<any> {
     await this.findOne(tenantId, id);
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = body.name;
@@ -74,7 +74,7 @@ export class IntegrationsService {
 
   async testConnection(tenantId: string, id: string) {
     const record = await this.findOne(tenantId, id);
-    const rawConfig = decryptObject(JSON.parse(record.configEnc));
+    const rawConfig = decryptObject(JSON.parse(record.configEnc)) as Record<string, unknown>;
     const integration = this.registry.build(record.type, rawConfig);
 
     let testStatus: string;
