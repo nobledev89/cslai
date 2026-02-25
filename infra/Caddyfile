@@ -1,0 +1,46 @@
+# =============================================================================
+# Caddyfile — Company Intel Bot
+# Caddy automatically obtains and renews TLS certificates via Let's Encrypt.
+# =============================================================================
+
+# ─── Admin UI ─────────────────────────────────────────────────────────────────
+ai.corporatespec.com {
+    # Proxy to Next.js web app
+    reverse_proxy web:3000
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Access logs
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}
+
+# ─── API ──────────────────────────────────────────────────────────────────────
+api.ai.corporatespec.com {
+    # Proxy to NestJS API
+    reverse_proxy api:3001
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+
+    # Access logs
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}

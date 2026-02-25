@@ -1,0 +1,59 @@
+version: '3.9'
+
+# =============================================================================
+# Company Intel Bot — Development Docker Compose
+# Runs only postgres + redis locally so you can start the apps natively.
+#
+# Usage:
+#   docker compose -f infra/docker-compose.dev.yml up -d
+#   pnpm --filter @company-intel/api dev
+#   pnpm --filter @company-intel/worker dev
+#   pnpm --filter @company-intel/web dev
+# =============================================================================
+
+networks:
+  intel-dev:
+    driver: bridge
+
+volumes:
+  postgres-dev-data:
+  redis-dev-data:
+
+services:
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: intel
+      POSTGRES_PASSWORD: intel_dev_pass
+      POSTGRES_DB: company_intel_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    networks:
+      - intel-dev
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U intel -d company_intel_dev']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --loglevel warning
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - intel-dev
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10

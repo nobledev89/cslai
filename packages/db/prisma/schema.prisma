@@ -1,0 +1,244 @@
+// =============================================================================
+// Company Intel Bot — Prisma Schema
+// Stage 1 placeholder — full schema populated in Stage 2
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenants
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  memberships       Membership[]
+  integrationConfigs IntegrationConfig[]
+  slackWorkspaces   SlackWorkspace[]
+  threadMemories    ThreadMemory[]
+  runs              Run[]
+  errorLogs         ErrorLog[]
+
+  @@map("tenants")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users + Memberships (many-to-many with role)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String    @map("password_hash")
+  name           String?
+  emailVerified  Boolean   @default(false) @map("email_verified")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  lastLoginAt    DateTime? @map("last_login_at")
+
+  // Relations
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+}
+
+model Membership {
+  id        String         @id @default(cuid())
+  tenantId  String         @map("tenant_id")
+  userId    String         @map("user_id")
+  role      MembershipRole @default(ADMIN)
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Integration Configs
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum IntegrationType {
+  SLACK
+  WOOCOMMERCE
+  GMAIL
+  CUSTOM_REST
+  TRACKPOD
+}
+
+model IntegrationConfig {
+  id           String          @id @default(cuid())
+  tenantId     String          @map("tenant_id")
+  type         IntegrationType
+  name         String
+  enabled      Boolean         @default(true)
+  // Encrypted JSON blob — decrypted at runtime using ENCRYPTION_KEY
+  configEnc    String          @map("config_enc")
+  lastTestedAt DateTime?       @map("last_tested_at")
+  testStatus   String?         @map("test_status")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, name])
+  @@index([tenantId])
+  @@map("integration_configs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slack Workspaces (per-tenant)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SlackWorkspace {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  teamId         String   @map("team_id")
+  teamName       String   @map("team_name")
+  botTokenEnc    String   @map("bot_token_enc")
+  allowedChannels String[] @map("allowed_channels")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, teamId])
+  @@index([teamId])
+  @@map("slack_workspaces")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Thread Memory
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ThreadMemory {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  threadKey    String   @map("thread_key")   // e.g. "slack:{teamId}:{channelId}:{threadTs}"
+  summaryText  String?  @map("summary_text")
+  messages     Json     @default("[]")        // Array of {role, content, ts}
+  totalTurns   Int      @default(0) @map("total_turns")
+  totalChars   Int      @default(0) @map("total_chars")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, threadKey])
+  @@index([tenantId])
+  @@index([threadKey])
+  @@map("thread_memories")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Runs + RunSteps + ErrorLogs
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  DEGRADED
+}
+
+model Run {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  jobId         String?   @map("job_id")       // BullMQ job ID
+  trigger       String                          // "slack_mention", "api", etc.
+  status        RunStatus @default(PENDING)
+  inputData     Json      @map("input_data")
+  outputSummary String?   @map("output_summary")
+  durationMs    Int?      @map("duration_ms")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  steps    RunStep[]
+  errors   ErrorLog[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("runs")
+}
+
+enum RunStepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model RunStep {
+  id           String        @id @default(cuid())
+  runId        String        @map("run_id")
+  integration  String                             // Integration type slug
+  status       RunStepStatus @default(PENDING)
+  inputData    Json?         @map("input_data")
+  outputData   Json?         @map("output_data")
+  errorMessage String?       @map("error_message")
+  durationMs   Int?          @map("duration_ms")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("run_steps")
+}
+
+model ErrorLog {
+  id          String   @id @default(cuid())
+  tenantId    String?  @map("tenant_id")
+  runId       String?  @map("run_id")
+  source      String                    // module/service that errored
+  message     String
+  stack       String?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  run    Run?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("error_logs")
+}
