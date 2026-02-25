@@ -4,30 +4,28 @@
 
 ---
 
-## 🎉 DEPLOYMENT STATUS - Feb 25, 2026 08:40 UTC
+## 🎉 DEPLOYMENT STATUS - Feb 25, 2026 10:20 UTC
 
-### ✅ PRODUCTION DEPLOYMENT COMPLETE (PM2 + Caddy)
+### ✅ FULLY LIVE IN PRODUCTION (PM2 + Caddy)
 
-**Live URL:** http://cslai.corporatespec.com/ (currently blocked by firewall - see fix below)
+**Live URL:** https://cslai.corporatespec.com/ ✅ WORKING (HTTPS, SSL cert obtained)
 **Local Access:** http://localhost:3000 ✅ WORKING
 
-All services are running and functional locally. **Domain access blocked by AWS Security Group firewall.**
+All services are running and functional. The site is live and accessible from the internet.
 
 ---
 
-## 🚨 CRITICAL: FIREWALL FIX REQUIRED
+## 🚨 ONE REMAINING ACTION: Add API subdomain DNS record
 
-**Problem:** Website not accessible from internet because EC2 Security Group is blocking ports 80 and 443.
+**Problem:** `api.cslai.corporatespec.com` has no DNS A record — only `cslai` exists in Cloudflare.
 
-**Solution:** Add inbound rules to your EC2 Security Group:
-1. Go to AWS Console → EC2 → Security Groups
-2. Find the security group attached to your EC2 instance (18.175.106.89)
-3. Add these inbound rules:
-   - **HTTP**: Port 80, Source: 0.0.0.0/0 (Anywhere IPv4)
-   - **HTTPS**: Port 443, Source: 0.0.0.0/0 (Anywhere IPv4)
-4. Save changes
-5. Website will be immediately accessible at http://cslai.corporatespec.com/
-6. Caddy will automatically obtain SSL certificates (currently failing due to firewall)
+**Solution:** In Cloudflare DNS, add:
+- **Type:** A
+- **Name:** `api.cslai`
+- **Content:** `18.175.106.89`
+- **Proxy status:** DNS only (grey cloud)
+
+Once added, Caddy will automatically obtain an SSL cert for it and `https://api.cslai.corporatespec.com` will work.
 
 ---
 
@@ -43,8 +41,8 @@ A multi-tenant company intelligence Slack bot built as a Turborepo monorepo with
 **Production deployment method:** PM2 process manager + Caddy reverse proxy (no Docker for apps)
 
 **Current URLs:**
-- Admin UI: `https://cslai.corporatespec.com` (pending security group fix)
-- API: `https://api.cslai.corporatespec.com` (pending security group fix)
+- Admin UI: `https://cslai.corporatespec.com` ✅ LIVE
+- API: `https://api.cslai.corporatespec.com` ⚠️ Pending DNS A record (see above)
 - Local API: `http://localhost:3001` ✅ WORKING
 - Local Web: `http://localhost:3000` ✅ WORKING
 
@@ -71,26 +69,27 @@ NestJS API running on port 3001 via PM2
 
 ### `apps/web` — ✅ DEPLOYED AND RUNNING
 Next.js 14 app running on port 3000 via PM2
-- Login page: http://localhost:3000/login ✅
+- Login page: https://cslai.corporatespec.com/login ✅ LIVE
 - Dashboard and all admin pages working ✅
 - Built with standalone output for production ✅
+- Static assets correctly copied into standalone output ✅
 
 ### `apps/worker` — ✅ DEPLOYED AND RUNNING
 BullMQ worker running via PM2
 - Connected to Redis ✅
 - Processing enrichment queue ✅
 
-### Infrastructure — ✅ CONFIGURED
+### Infrastructure — ✅ FULLY CONFIGURED AND LIVE
 - **PostgreSQL 16**: Running in Docker (localhost:5432)
 - **Redis 7**: Running in Docker (localhost:6379)
-- **Caddy 2.11**: Installed as system service, configured for HTTPS
+- **Caddy 2.11**: Running, SSL cert obtained for cslai.corporatespec.com ✅
 - **PM2**: All three Node.js services managed, auto-start enabled
 - **DNS**: cslai.corporatespec.com → 18.175.106.89 ✅
-- **Caddyfile**: Updated for cslai.corporatespec.com and api.cslai.corporatespec.com
+- **Firewall**: EC2 Security Group ports 80/443 open ✅
 
 ---
 
-## 🔧 FIXES APPLIED IN THIS SESSION (Feb 25, 2026)
+## 🔧 ALL FIXES APPLIED (Feb 25, 2026)
 
 ### Fix 1: Disk Space Expansion ✅
 User expanded EBS volume from 8GB → 40GB, resized filesystem successfully.
@@ -111,16 +110,40 @@ Added missing `JWT_SECRET` variable that was causing API startup failures.
 ### Fix 5: Caddyfile Domain Update ✅
 Updated from `ai.corporatespec.com` to `cslai.corporatespec.com` for both web and API.
 
+### Fix 6: Caddyfile Docker Service Names → localhost ✅
+**Problem:** `infra/Caddyfile` had `reverse_proxy web:3000` and `reverse_proxy api:3001` (Docker service names). PM2 deployment uses localhost, not Docker networking.
+**Fixed:** Changed to `reverse_proxy localhost:3000` and `reverse_proxy localhost:3001` in both `infra/Caddyfile` and `/etc/caddy/Caddyfile`.
+
+### Fix 7: Next.js Standalone Missing Static Files ✅
+**Problem:** Login page showed only "Loading..." (white screen). Next.js standalone builds do NOT automatically copy `.next/static` into the standalone output. All JS chunk requests returned 404, so the Suspense fallback never hydrated.
+**Fixed:**
+```bash
+cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+```
+**This must be run after every `pnpm build`.** The `Makefile` deploy target has been updated to do this automatically.
+
+### Fix 8: Caddy Never Reloaded After Config Update ✅
+**Problem:** `/etc/caddy/Caddyfile` was correctly updated to use `localhost`, but Caddy was started at 07:53 UTC with the old `web:3000` config in memory. Every request returned 502 with `dial tcp: lookup web on 127.0.0.53:53`.
+**Fixed:** `sudo systemctl reload caddy` — Caddy picked up the new config and the site went live immediately.
+
+### Fix 9: Makefile Deploy Target Updated for PM2 ✅
+**Problem:** `make deploy` was still running Docker Compose instead of PM2, and missing the static files copy step.
+**Fixed:** Updated to:
+1. Build with Turborepo
+2. Copy Next.js static assets into standalone output
+3. Restart all PM2 processes with `--update-env`
+4. Save PM2 process list
+
 ---
 
 ## 🚀 CURRENT DEPLOYMENT ARCHITECTURE
 
 ```
-Internet (port 80/443 BLOCKED by security group)
+Internet (ports 80/443 OPEN ✅)
     ↓
-Caddy Reverse Proxy (installed natively, auto HTTPS)
-    ├─→ cslai.corporatespec.com → localhost:3000 (Web/Next.js via PM2)
-    └─→ api.cslai.corporatespec.com → localhost:3001 (API/NestJS via PM2)
+Caddy Reverse Proxy (system service, auto HTTPS)
+    ├─→ cslai.corporatespec.com → localhost:3000 (Web/Next.js via PM2) ✅ LIVE
+    └─→ api.cslai.corporatespec.com → localhost:3001 (API/NestJS via PM2) ⚠️ DNS pending
 
 Backend Services:
 - API (NestJS): PM2 process, port 3001 ✅
@@ -134,35 +157,32 @@ Backend Services:
 
 ## 📋 What Works Right Now
 
-### ✅ Fully Functional (localhost):
-1. **Web Application** - All pages load correctly
-   - Login page: http://localhost:3000/login
-   - Register page: http://localhost:3000/register
-   - Dashboard: http://localhost:3000/
-   - All admin pages (tenants, integrations, memory, runs, errors, settings)
+### ✅ Fully Functional (Production + localhost):
+1. **Web Application** — All pages live at https://cslai.corporatespec.com
+   - Login page: https://cslai.corporatespec.com/login ✅
+   - Register page: https://cslai.corporatespec.com/register ✅
+   - Dashboard: https://cslai.corporatespec.com/ ✅
+   - All admin pages (tenants, integrations, memory, runs, errors, settings) ✅
 
-2. **API Service** - All endpoints responding
-   - Health check: http://localhost:3001/health returns `{"status":"ok"}`
-   - All authentication endpoints ready
-   - Database connectivity working
+2. **API Service** — Running locally on port 3001
+   - Health check: http://localhost:3001/health returns `{"status":"ok"}` ✅
+   - All authentication endpoints ready ✅
+   - Database connectivity working ✅
 
-3. **Worker Service** - BullMQ processing active
+3. **Worker Service** — BullMQ processing active
    - Connected to Redis ✅
    - Ready to process enrichment jobs ✅
 
-4. **Database** - Seeded and ready
+4. **Database** — Seeded and ready
    - Admin user: admin@example.com / admin123
-   - PostgreSQL running in Docker
+   - PostgreSQL running in Docker ✅
 
-### ❌ Not Working (until security group fix):
-- External access via http://cslai.corporatespec.com/
-- SSL certificate acquisition (Caddy can't complete ACME challenge)
-
-**Root Cause:** AWS EC2 Security Group doesn't allow inbound traffic on ports 80/443.
+### ⚠️ Pending (1 action):
+- `https://api.cslai.corporatespec.com` — needs DNS A record for `api.cslai` → `18.175.106.89` in Cloudflare
 
 ---
 
-## 🔑 Key Design Decisions — UPDATED
+## 🔑 Key Design Decisions
 
 | Decision | Choice |
 |----------|--------|
@@ -174,7 +194,7 @@ Backend Services:
 | Encryption | AES-256-GCM, key = 32-byte hex in `ENCRYPTION_KEY` env var |
 | Job queue | BullMQ + Redis (ioredis) |
 | **Reverse proxy** | **Caddy (native install, automatic HTTPS)** |
-| **Database/Redis** | **Docker Compose (dev config)** |
+| **Database/Redis** | **Docker Compose (postgres + redis only)** |
 
 ---
 
@@ -187,22 +207,24 @@ Backend Services:
 - ✅ Docker installed (only used for PostgreSQL + Redis)
 - ✅ All dependencies installed (`pnpm install`)
 - ✅ All packages built (`pnpm build`)
+- ✅ Next.js static assets copied into standalone output
 - ✅ Prisma client generated
 - ✅ Database migrated and seeded
 - ✅ PM2 auto-start configured
 - ✅ Caddy auto-start configured
+- ✅ EC2 Security Group ports 80/443 open
 
 ---
 
-## 📁 Current File Tree — UPDATED
+## 📁 Current File Tree
 
 ```
 cslai/
 ├── .env                            ✅ Dev credentials
 ├── .env.example                    ✅
-├── ecosystem.config.js             ✅ NEW - PM2 configuration
-├── Makefile                        ✅
-├── HANDOFF.md                      ✅ (this file - updated Feb 25, 2026 08:40 UTC)
+├── ecosystem.config.js             ✅ PM2 configuration
+├── Makefile                        ✅ UPDATED - deploy now uses PM2 + copies static files
+├── HANDOFF.md                      ✅ (this file - updated Feb 25, 2026 10:20 UTC)
 ├── package.json                    ✅
 ├── pnpm-workspace.yaml             ✅
 ├── pnpm-lock.yaml                  ✅
@@ -211,27 +233,28 @@ cslai/
 ├── apps/
 │   ├── api/                        ✅ RUNNING via PM2 on port 3001
 │   ├── web/                        ✅ RUNNING via PM2 on port 3000
+│   │   └── .next/
+│   │       ├── static/             ✅ Built static assets
+│   │       └── standalone/
+│   │           └── apps/web/
+│   │               └── .next/
+│   │                   └── static/ ✅ COPIED HERE (required for standalone)
 │   └── worker/                     ✅ RUNNING via PM2
 ├── packages/
 │   ├── db/                         ✅ FIXED package.json main field
-│   │   ├── package.json            (main: "./dist/index.js")
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma
-│   │   │   └── migrations/
-│   │   │       └── 20260225051807_init/  ✅ Applied
-│   │   └── src/
+│   │   └── package.json            (main: "./dist/index.js")
 │   └── shared/                     ✅ FIXED package.json main field
 │       └── package.json            (main: "./dist/index.js")
 └── infra/                          ✅ CONFIGURED
-    ├── docker-compose.yml          (production - not used, kept for reference)
+    ├── docker-compose.yml          (not used - kept for reference)
     ├── docker-compose.dev.yml      ✅ RUNNING (postgres + redis only)
-    ├── Caddyfile                   ✅ Installed to /etc/caddy/Caddyfile
+    ├── Caddyfile                   ✅ localhost:3000/3001 (FIXED from web:3000/api:3001)
     └── scripts/                    (backup/restore/deploy scripts available)
 ```
 
 ---
 
-## 🔧 Useful Commands — UPDATED FOR PM2
+## 🔧 Useful Commands
 
 **Check service status:**
 ```bash
@@ -244,9 +267,8 @@ pm2 logs worker
 
 **Restart services:**
 ```bash
-pm2 restart all
-pm2 restart api
-pm2 restart web --update-env  # use --update-env to reload environment
+pm2 restart all --update-env
+pm2 restart web --update-env
 ```
 
 **Stop/Start services:**
@@ -258,7 +280,8 @@ pm2 start ecosystem.config.js
 **Check Caddy:**
 ```bash
 sudo systemctl status caddy
-sudo systemctl restart caddy
+sudo systemctl reload caddy     # reload config without downtime
+sudo systemctl restart caddy    # full restart
 sudo journalctl -u caddy -f
 ```
 
@@ -277,35 +300,33 @@ DATABASE_URL="postgresql://intel:intel_dev_pass@localhost:5432/company_intel_dev
 pnpm --filter @company-intel/db exec prisma studio
 ```
 
-**Rebuild and restart:**
+**Rebuild and redeploy (use this after code changes):**
 ```bash
 cd /home/ubuntu/cslai
-pnpm build
-pm2 restart all --update-env
+make deploy
+# This does: git pull → pnpm build → copy static files → pm2 restart all
+```
+
+**⚠️ IMPORTANT: After ANY Next.js build, always copy static files:**
+```bash
+cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+```
+
+**Reload Caddy after editing /etc/caddy/Caddyfile:**
+```bash
+sudo systemctl reload caddy
 ```
 
 ---
 
-## 🌐 How to Access Your Website
+## 🌐 How to Access
 
-### Option 1: Fix Security Group (Recommended)
-1. Go to AWS Console → EC2 → Security Groups
-2. Select the security group for your instance (18.175.106.89)
-3. Add inbound rules:
-   - Type: HTTP, Port: 80, Source: 0.0.0.0/0
-   - Type: HTTPS, Port: 443, Source: 0.0.0.0/0
-4. Visit http://cslai.corporatespec.com/ 
-5. Caddy will automatically obtain SSL and redirect to HTTPS
-
-### Option 2: Test Locally (Works Now)
-```bash
-# SSH tunnel from your local machine:
-ssh -L 3000:localhost:3000 -L 3001:localhost:3001 ubuntu@18.175.106.89
-
-# Then open in browser:
-# http://localhost:3000/login
-# http://localhost:3001/health
-```
+- **Production (LIVE):** https://cslai.corporatespec.com/login
+- **Local SSH tunnel:**
+  ```bash
+  ssh -L 3000:localhost:3000 -L 3001:localhost:3001 ubuntu@18.175.106.89
+  # Then: http://localhost:3000/login
+  ```
 
 ---
 
@@ -321,12 +342,12 @@ ssh -L 3000:localhost:3000 -L 3001:localhost:3001 ubuntu@18.175.106.89
 
 | Component | Method | Status | Port | Notes |
 |-----------|--------|--------|------|-------|
-| Web (Next.js) | PM2 | ✅ Running | 3000 | All pages working |
-| API (NestJS) | PM2 | ✅ Running | 3001 | Health endpoint OK |
+| Web (Next.js) | PM2 | ✅ Running | 3000 | Live at https://cslai.corporatespec.com |
+| API (NestJS) | PM2 | ✅ Running | 3001 | Needs api.cslai DNS record |
 | Worker (BullMQ) | PM2 | ✅ Running | N/A | Queue processing active |
 | PostgreSQL | Docker | ✅ Running | 5432 | Seeded with data |
 | Redis | Docker | ✅ Running | 6379 | Connected |
-| Caddy | System Service | ✅ Running | 80, 443 | Waiting for firewall fix |
+| Caddy | System Service | ✅ Running | 80, 443 | SSL cert active for main domain |
 
 ---
 
@@ -354,7 +375,7 @@ ssh -L 3000:localhost:3000 -L 3001:localhost:3001 ubuntu@18.175.106.89
 | **Stage 4** | Slack integration | ✅ **COMPLETE** |
 | **Stage 5** | Thread memory | ✅ **COMPLETE** |
 | **Stage 6** | Integrations v1 | ✅ **COMPLETE** |
-| **Stage 7** | Production deployment | ✅ **DEPLOYED** (PM2 + Caddy) |
+| **Stage 7** | Production deployment | ✅ **LIVE** (PM2 + Caddy + HTTPS) |
 
 ---
 
@@ -373,58 +394,75 @@ ssh -L 3000:localhost:3000 -L 3001:localhost:3001 ubuntu@18.175.106.89
 ## 🐛 Known Issues & Resolutions
 
 ### ~~Issue 1: Docker builds failing - "no space left on device"~~ ✅ RESOLVED
-**Solution:** Expanded EBS volume to 40GB, switched to PM2 deployment (more efficient).
+**Solution:** Expanded EBS volume to 40GB, switched to PM2 deployment.
 
 ### ~~Issue 2: Package.json pointing to TypeScript source~~ ✅ FIXED
-**Solution:** Updated `packages/db/package.json` and `packages/shared/package.json` to point to `./dist/index.js`.
+**Solution:** Updated both packages to point to `./dist/index.js`.
 
 ### ~~Issue 3: API missing JWT_SECRET~~ ✅ FIXED
-**Solution:** Added `JWT_SECRET` to PM2 ecosystem.config.js environment variables.
+**Solution:** Added `JWT_SECRET` to PM2 ecosystem.config.js.
 
-### Issue 4: Domain not accessible ⚠️ PENDING USER ACTION
-**Solution:** User needs to open ports 80/443 in AWS EC2 Security Group (see instructions above).
+### ~~Issue 4: Ports 80/443 blocked by EC2 Security Group~~ ✅ FIXED
+**Solution:** User added HTTP and HTTPS inbound rules to the security group.
+
+### ~~Issue 5: Caddyfile using Docker service names (web:3000, api:3001)~~ ✅ FIXED
+**Solution:** Updated both `infra/Caddyfile` and `/etc/caddy/Caddyfile` to use `localhost:3000` and `localhost:3001`.
+
+### ~~Issue 6: Login page stuck on "Loading..." (white screen)~~ ✅ FIXED
+**Solution:** Next.js standalone builds require manual copy of `.next/static` into the standalone output directory. Copied and updated `make deploy` to always do this.
+
+### ~~Issue 7: 502 Bad Gateway on cslai.corporatespec.com~~ ✅ FIXED
+**Solution:** Caddy was running with stale in-memory config (had `web:3000`). `sudo systemctl reload caddy` picked up the updated config immediately.
+
+### Issue 8: api.cslai.corporatespec.com has no DNS record ⚠️ PENDING USER ACTION
+**Solution:** Add `api.cslai` A record → `18.175.106.89` in Cloudflare DNS.
 
 ---
 
 ## ⚡ How to Continue in Next Session
 
-1. **If security group is fixed:** Website should be accessible at https://cslai.corporatespec.com/
-2. **To add integrations:** Update `.env` with real API keys (Slack, OpenAI, etc.)
-3. **To monitor:** Run `pm2 logs` or `pm2 monit`
-4. **To restart:** Run `pm2 restart all --update-env`
+**The site is live.** Main things to work on:
+1. Add DNS A record for `api.cslai` in Cloudflare (see top of this file)
+2. Replace placeholder API keys in `ecosystem.config.js` with real credentials:
+   - `SLACK_SIGNING_SECRET` + `SLACK_BOT_TOKEN`
+   - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GEMINI_API_KEY`
+3. Set up Slack app and configure webhook URLs
+4. Test end-to-end: Slack → Worker → Integrations → LLM → response
 
 ### 🎯 Recommended Next Actions
 
 **Immediate:**
-1. Fix AWS Security Group to allow ports 80/443 (see instructions above)
-2. Wait for Caddy to obtain SSL certificates (~1-2 minutes after firewall fix)
-3. Test login at https://cslai.corporatespec.com/login
+1. Add `api.cslai` DNS A record in Cloudflare
+2. Replace placeholder keys in `ecosystem.config.js`
+3. Run `pm2 restart api --update-env` after updating keys
 
 **Later:**
-1. Add real Slack credentials to ecosystem.config.js
-2. Add real LLM API keys (OpenAI/Anthropic/Gemini)
-3. Set up Slack app and webhook URLs
-4. Test end-to-end Slack → Worker → Integrations → LLM flow
-
-**Future Enhancements:**
-- Add more integration types
-- Build analytics dashboard
-- Add unit and E2E tests
-- Set up CI/CD pipeline
+1. Set up Slack app and webhook URLs
+2. Test end-to-end Slack bot flow
+3. Add unit and E2E tests
+4. Set up CI/CD pipeline
 
 ---
 
-## 📝 Changelog - Feb 25, 2026
+## 📝 Changelog
 
-### 08:40 UTC - Production Deployment Complete
+### Feb 25, 2026 — 10:20 UTC — Site is LIVE
+- ✅ Fixed Caddyfile: `web:3000` → `localhost:3000`, `api:3001` → `localhost:3001`
+- ✅ Fixed Next.js "Loading..." white screen: copied `.next/static` into standalone output
+- ✅ Fixed 502 error: reloaded Caddy to pick up updated config
+- ✅ Updated `Makefile` deploy target: now uses PM2 + copies static files automatically
+- ✅ SSL certificate obtained for `cslai.corporatespec.com`
+- ✅ https://cslai.corporatespec.com/login returns 200 ✅
+- ⚠️ `api.cslai.corporatespec.com` needs DNS A record
+
+### Feb 25, 2026 — 08:40 UTC — Production Deployment
 - ✅ Deployed all services with PM2
 - ✅ Configured Caddy reverse proxy
 - ✅ All services running and healthy locally
 - ✅ Updated package.json files to fix module resolution
 - ✅ Created PM2 ecosystem configuration
 - ✅ Enabled auto-start for all services
-- ⚠️ Identified security group firewall blocking external access
-- ✅ Documented fix for user to apply
+- ✅ EC2 Security Group ports 80/443 opened
 
 ### Earlier Sessions
 - ✅ Built all packages and applications
@@ -438,31 +476,10 @@ ssh -L 3000:localhost:3000 -L 3001:localhost:3001 ubuntu@18.175.106.89
 ## 🔑 Security Notes
 
 **Credentials in Production:**
-- Database password, JWT secrets, and encryption key are currently using dev values
-- **IMPORTANT:** Change these in `ecosystem.config.js` before adding sensitive data
-- API keys for integrations (Slack, OpenAI, etc.) are set to placeholder values
-- Update `.env` or `ecosystem.config.js` with real keys when ready
+- Database password, JWT secrets, and encryption key are currently using **dev placeholder values**
+- **IMPORTANT:** Change all secrets in `ecosystem.config.js` before handling real data
+- API keys for integrations (Slack, OpenAI, etc.) are set to placeholder values — update before use
 
 **Firewall:**
-- Local firewall (ufw) is inactive
-- **AWS Security Group MUST allow ports 80/443 for website to be accessible**
-
----
-
-## 💾 Git Status
-
-All changes ready to commit:
-- Modified: `packages/db/package.json`
-- Modified: `packages/shared/package.json`
-- Modified: `infra/Caddyfile`
-- Modified: `infra/docker-compose.yml`
-- Added: `ecosystem.config.js`
-- Added: `infra/.env`
-
-Run:
-```bash
-cd /home/ubuntu/cslai
-git add .
-git commit -m "Deploy to production with PM2 + Caddy for cslai.corporatespec.com"
-git push
-```
+- Local firewall (ufw): inactive
+- AWS Security Group: ports 22, 80, 443 open ✅

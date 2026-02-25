@@ -122,7 +122,11 @@ deploy:
 	pnpm install --frozen-lockfile
 	pnpm turbo run build
 	$(MAKE) migrate
-	docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
+	@echo "📦 Copying Next.js static assets into standalone output..."
+	cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+	@if [ -d "apps/web/public" ]; then cp -r apps/web/public apps/web/.next/standalone/apps/web/public; fi
+	pm2 restart all --update-env
+	pm2 save
 	@echo "✅ Deploy complete."
 
 # =============================================================================

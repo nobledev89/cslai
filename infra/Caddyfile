@@ -6,7 +6,7 @@
 # ─── Admin UI ─────────────────────────────────────────────────────────────────
 cslai.corporatespec.com {
     # Proxy to Next.js web app
-    reverse_proxy web:3000
+    reverse_proxy localhost:3000
 
     # Security headers
     header {
@@ -28,7 +28,7 @@ cslai.corporatespec.com {
 # ─── API ──────────────────────────────────────────────────────────────────────
 api.cslai.corporatespec.com {
     # Proxy to NestJS API
-    reverse_proxy api:3001
+    reverse_proxy localhost:3001
 
     # Security headers
     header {
