@@ -52,18 +52,33 @@ async function callLlm(messages: LlmMessage[], tenantId: string): Promise<string
     
     if (settings?.llmConfigEnc) {
       const llmConfig = decryptObject<{
-        provider?: string;
-        model?: string;
-        openaiApiKey?: string;
-        anthropicApiKey?: string;
-        geminiApiKey?: string;
+        providers: Array<{
+          provider: string;
+          model: string;
+          apiKey: string;
+          enabled: boolean;
+          priority: number;
+        }>;
       }>(settings.llmConfigEnc);
       
-      provider = llmConfig.provider || provider;
-      model = llmConfig.model || '';
-      openaiKey = llmConfig.openaiApiKey || openaiKey;
-      anthropicKey = llmConfig.anthropicApiKey || anthropicKey;
-      geminiKey = llmConfig.geminiApiKey || geminiKey;
+      // Use the first enabled provider with an API key, sorted by priority
+      const enabledProvider = llmConfig.providers
+        .filter(p => p.enabled && p.apiKey && p.apiKey.trim().length > 0)
+        .sort((a, b) => a.priority - b.priority)[0];
+      
+      if (enabledProvider) {
+        provider = enabledProvider.provider;
+        model = enabledProvider.model;
+        
+        // Set the appropriate API key based on provider
+        if (provider === 'openai') {
+          openaiKey = enabledProvider.apiKey;
+        } else if (provider === 'anthropic') {
+          anthropicKey = enabledProvider.apiKey;
+        } else if (provider === 'gemini') {
+          geminiKey = enabledProvider.apiKey;
+        }
+      }
     }
   } catch (error) {
     // Fallback to env vars if database fetch fails
