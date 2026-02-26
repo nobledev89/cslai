@@ -45,8 +45,8 @@ module.exports = {
     {
       name: 'worker',
       cwd: '/home/ubuntu/cslai',
-      script: 'node',
-      args: 'apps/worker/dist/main.js',
+      script: 'npx',
+      args: 'tsx apps/worker/src/main.ts',
       env: {
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://intel:intel_dev_pass@localhost:5432/company_intel_dev?schema=public',
