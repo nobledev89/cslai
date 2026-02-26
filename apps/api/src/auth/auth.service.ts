@@ -17,7 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from '../common/decorators/current-user.decorator';
 
-const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
 @Injectable()
@@ -155,6 +155,6 @@ export class AuthService {
       data: { userId, token: rawRefreshToken, expiresAt },
     });
 
-    return { accessToken, refreshToken: rawRefreshToken, expiresIn: 900 };
+    return { accessToken, refreshToken: rawRefreshToken, expiresIn: 604800 };
   }
 }

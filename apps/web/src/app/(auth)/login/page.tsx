@@ -37,7 +37,7 @@ function LoginFormContent() {
       <div className="w-full max-w-md">
         <div className="card p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-900">Company Intel Bot</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Corporate Spec Intel Bot</h1>
             <p className="text-gray-500 mt-1 text-sm">Admin Panel</p>
           </div>
 
