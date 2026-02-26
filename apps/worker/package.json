@@ -15,12 +15,12 @@
     "bullmq": "^5.12.0",
     "ioredis": "^5.4.1",
     "pino": "^9.3.0",
-    "pino-pretty": "^11.2.0"
+    "pino-pretty": "^11.2.0",
+    "tsx": "^4.16.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "rimraf": "^5.0.0",
-    "tsx": "^4.16.0",
     "typescript": "^5.4.0"
   }
 }
