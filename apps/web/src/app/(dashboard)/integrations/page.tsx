@@ -22,7 +22,7 @@ const defaultConfigs: Record<IntegrationType, Record<string, unknown>> = {
   WOOCOMMERCE: { baseUrl: '', consumerKey: '', consumerSecret: '', apiVersion: 'wc/v3', timeoutMs: 10000 },
   GMAIL: { clientId: '', clientSecret: '', redirectUri: '', maxResults: 10 },
   CUSTOM_REST: { baseUrl: '', method: 'GET', headers: {}, queryParam: 'q', resultsJsonPath: '$.results', labelJsonPath: '$.name', timeoutMs: 8000 },
-  TRACKPOD: { apiKey: '', baseUrl: 'https://api.trackpod.io', enabled: false },
+  TRACKPOD: { apiKey: '', baseUrl: 'https://api.track-pod.com', maxResults: 20, timeoutMs: 10000 },
 };
 
 // ─── Field renderer ───────────────────────────────────────────────────────────

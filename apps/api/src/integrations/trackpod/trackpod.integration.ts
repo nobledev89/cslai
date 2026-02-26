@@ -52,20 +52,9 @@ export class TrackpodIntegration implements IIntegration {
   }
 
   /**
-   * Check if integration is enabled (default to true if not specified)
-   */
-  private get isEnabled(): boolean {
-    return this.config.enabled !== false;
-  }
-
-  /**
    * Test connection by fetching vehicles (lightweight endpoint)
    */
   async testConnection(): Promise<void> {
-    if (!this.isEnabled) {
-      throw new Error('TrackPod integration is disabled');
-    }
-
     const url = `${this.baseUrl}/Vehicle`;
     const res = await fetch(url, {
       method: 'GET',
@@ -87,10 +76,6 @@ export class TrackpodIntegration implements IIntegration {
    */
   async runEnrichment(query: string): Promise<NormalizedResult> {
     const startTime = Date.now();
-
-    if (!this.isEnabled) {
-      return okResult('TRACKPOD', []);
-    }
 
     try {
       // Search for orders by number or route code
