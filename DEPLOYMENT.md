@@ -175,8 +175,10 @@ make deploy
 | 3 | `pnpm turbo run build` — build all apps |
 | 4 | `make migrate` — apply any pending DB migrations |
 | 5 | Copy Next.js static assets into standalone output |
-| 6 | `pm2 restart all --update-env` — reload processes |
-| 7 | `pm2 save` — persist process list |
+| 6 | `sudo cp infra/Caddyfile /etc/caddy/Caddyfile` — update Caddy config |
+| 7 | `sudo systemctl reload caddy` — reload Caddy |
+| 8 | `pm2 restart all --update-env` — reload processes |
+| 9 | `pm2 save` — persist process list |
 
 ### 3.3 Verify the deployment
 

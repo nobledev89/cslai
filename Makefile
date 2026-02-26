@@ -123,6 +123,10 @@ deploy:
 	@echo "📦 Copying Next.js static assets into standalone output..."
 	cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
 	@if [ -d "apps/web/public" ]; then cp -r apps/web/public apps/web/.next/standalone/apps/web/public; fi
+	@echo "🔧 Updating Caddy configuration..."
+	sudo cp infra/Caddyfile /etc/caddy/Caddyfile
+	sudo systemctl reload caddy
+	@echo "🔄 Restarting application services..."
 	pm2 restart all --update-env
 	pm2 save
 	@echo "✅ Deploy complete."
