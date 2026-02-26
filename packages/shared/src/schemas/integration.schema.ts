@@ -70,15 +70,18 @@ export const CustomRestConfigSchema = z.object({
 
 export type CustomRestConfig = z.infer<typeof CustomRestConfigSchema>;
 
-// ─── Trackpod (feature-flagged stub) ─────────────────────────────────────────
+// ─── Trackpod ─────────────────────────────────────────────────────────────────
 
 export const TrackpodConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().min(1, { message: 'API key is required' }),
   baseUrl: z
     .string()
     .url()
-    .default('https://api.trackpod.io'),
-  enabled: z.boolean().default(false),
+    .default('https://api.track-pod.com'),
+  /** Max items to return per search */
+  maxResults: z.number().int().min(1).max(100).default(20),
+  timeoutMs: z.number().int().min(1000).max(30000).default(10000),
+  enabled: z.boolean().default(true),
 });
 
 export type TrackpodConfig = z.infer<typeof TrackpodConfigSchema>;
