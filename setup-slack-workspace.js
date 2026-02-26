@@ -1,8 +1,11 @@
 // Quick script to create SlackWorkspace record
 // Run this on your server with: node setup-slack-workspace.js
 
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require('./node_modules/@prisma/client');
 const { encryptObject } = require('./packages/db/dist/encryption');
+
+// Load environment variables
+require('dotenv').config({ path: './.env' });
 
 const prisma = new PrismaClient();
 
