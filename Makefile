@@ -116,7 +116,7 @@ docker-down:
 deploy:
 	@echo "🚀 Deploying Company Intel Bot..."
 	git pull origin main
-	pnpm install --frozen-lockfile
+	pnpm install --no-frozen-lockfile
 	pnpm turbo run build
 	$(MAKE) migrate
 	@echo "📦 Copying Next.js static assets into standalone output..."
