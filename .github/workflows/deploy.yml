@@ -23,5 +23,13 @@ jobs:
             set -e
             echo "🚀 Starting deployment..."
             cd /home/ubuntu/cslai
-            make deploy
+            git pull origin main
+            pnpm install --frozen-lockfile
+            pnpm turbo run build
+            pnpm --filter @company-intel/db exec prisma migrate deploy
+            echo "📦 Copying Next.js static assets into standalone output..."
+            cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+            if [ -d "apps/web/public" ]; then cp -r apps/web/public apps/web/.next/standalone/apps/web/public; fi
+            pm2 restart all --update-env
+            pm2 save
             echo "✅ Deployment complete!"
