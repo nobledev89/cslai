@@ -517,6 +517,153 @@ async function runTrackpod(
   });
 }
 
+async function runXero(
+  config: {
+    clientId: string;
+    clientSecret: string;
+    tenantId: string;
+    accessToken?: string;
+    refreshToken?: string;
+    tokenExpiry?: number;
+    maxResults?: number;
+    timeoutMs?: number;
+  },
+  query: string,
+  t0: number,
+): Promise<NormalizedResult> {
+  if (!config.accessToken) {
+    return errResult('XERO', 'Xero access token is missing. Please complete OAuth flow.', {
+      durationMs: Date.now() - t0,
+    });
+  }
+
+  const maxResults = config.maxResults ?? 10;
+  const timeoutMs = config.timeoutMs ?? 10000;
+
+  const headers = {
+    Authorization: `Bearer ${config.accessToken}`,
+    'Content-Type': 'application/json',
+    'Xero-tenant-id': config.tenantId,
+  };
+
+  // Search contacts and invoices in parallel
+  const results = await Promise.allSettled([
+    // Search contacts
+    fetch(
+      `https://api.xero.com/api.xro/2.0/Contacts?where=Name.Contains("${encodeURIComponent(query)}")`,
+      {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    ),
+    // Search invoices
+    fetch(
+      `https://api.xero.com/api.xro/2.0/Invoices?where=Contact.Name.Contains("${encodeURIComponent(query)}")`,
+      {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    ),
+  ]);
+
+  const items: NormalizedResultItem[] = [];
+
+  // Process contacts
+  if (results[0].status === 'fulfilled' && results[0].value.ok) {
+    try {
+      const data = (await results[0].value.json()) as {
+        Contacts: Array<{
+          ContactID: string;
+          Name: string;
+          EmailAddress?: string;
+          ContactStatus?: string;
+          UpdatedDateUTC?: string;
+        }>;
+      };
+
+      for (const contact of data.Contacts || []) {
+        items.push({
+          label: `Contact: ${contact.Name}`,
+          summary: `Email: ${contact.EmailAddress || 'N/A'}, Status: ${contact.ContactStatus || 'N/A'}`,
+          data: {
+            contactId: contact.ContactID,
+            name: contact.Name,
+            email: contact.EmailAddress,
+            status: contact.ContactStatus,
+          },
+          timestamp: contact.UpdatedDateUTC,
+        });
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }
+
+  // Process invoices
+  if (results[1].status === 'fulfilled' && results[1].value.ok) {
+    try {
+      const data = (await results[1].value.json()) as {
+        Invoices: Array<{
+          InvoiceID: string;
+          InvoiceNumber: string;
+          Type: string;
+          Status: string;
+          Total: number;
+          CurrencyCode: string;
+          Contact: { Name: string };
+          DateString?: string;
+          UpdatedDateUTC?: string;
+        }>;
+      };
+
+      for (const invoice of data.Invoices || []) {
+        items.push({
+          label: `${invoice.Type} #${invoice.InvoiceNumber} — ${invoice.Contact.Name}`,
+          summary: `Status: ${invoice.Status}, Total: ${invoice.CurrencyCode} ${invoice.Total}`,
+          data: {
+            invoiceId: invoice.InvoiceID,
+            invoiceNumber: invoice.InvoiceNumber,
+            type: invoice.Type,
+            status: invoice.Status,
+            total: invoice.Total,
+            currency: invoice.CurrencyCode,
+            contactName: invoice.Contact.Name,
+          },
+          timestamp: invoice.UpdatedDateUTC || invoice.DateString,
+        });
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }
+
+  // Check for authentication errors
+  for (const result of results) {
+    if (result.status === 'fulfilled' && (result.value.status === 401 || result.value.status === 403)) {
+      return errResult('XERO', 'Xero authentication failed. Please re-authenticate.', {
+        durationMs: Date.now() - t0,
+      });
+    }
+  }
+
+  // If no results found, return empty success
+  if (items.length === 0) {
+    return okResult('XERO', [], {
+      totalCount: 0,
+      durationMs: Date.now() - t0,
+      statusMessage: 'No contacts or invoices found matching the query',
+    });
+  }
+
+  // Limit results
+  const limitedItems = items.slice(0, maxResults);
+
+  return okResult('XERO', limitedItems, {
+    totalCount: limitedItems.length,
+    durationMs: Date.now() - t0,
+  });
+}
+
 // ─── Dispatch to correct integration runner ───────────────────────────────────
 
 async function runIntegration(
@@ -546,6 +693,21 @@ async function runIntegration(
       case 'TRACKPOD':
         return await runTrackpod(
           config as { apiKey: string; baseUrl?: string; maxResults?: number; timeoutMs?: number },
+          query,
+          t0,
+        );
+      case 'XERO':
+        return await runXero(
+          config as {
+            clientId: string;
+            clientSecret: string;
+            tenantId: string;
+            accessToken?: string;
+            refreshToken?: string;
+            tokenExpiry?: number;
+            maxResults?: number;
+            timeoutMs?: number;
+          },
           query,
           t0,
         );
