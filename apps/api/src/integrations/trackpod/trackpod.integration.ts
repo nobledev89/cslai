@@ -31,18 +31,46 @@ export class TrackpodIntegration implements IIntegration {
   }
 
   /**
+   * Get timeout with safe default
+   */
+  private get timeoutMs(): number {
+    return this.config.timeoutMs ?? 10000;
+  }
+
+  /**
+   * Get max results with safe default
+   */
+  private get maxResults(): number {
+    return this.config.maxResults ?? 20;
+  }
+
+  /**
+   * Get base URL with safe default
+   */
+  private get baseUrl(): string {
+    return this.config.baseUrl ?? 'https://api.track-pod.com';
+  }
+
+  /**
+   * Check if integration is enabled (default to true if not specified)
+   */
+  private get isEnabled(): boolean {
+    return this.config.enabled !== false;
+  }
+
+  /**
    * Test connection by fetching vehicles (lightweight endpoint)
    */
   async testConnection(): Promise<void> {
-    if (!this.config.enabled) {
+    if (!this.isEnabled) {
       throw new Error('TrackPod integration is disabled');
     }
 
-    const url = `${this.config.baseUrl}/Vehicle`;
+    const url = `${this.baseUrl}/Vehicle`;
     const res = await fetch(url, {
       method: 'GET',
       headers: this.authHeaders,
-      signal: AbortSignal.timeout(this.config.timeoutMs),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
 
     if (res.status === 401 || res.status === 403) {
@@ -60,7 +88,7 @@ export class TrackpodIntegration implements IIntegration {
   async runEnrichment(query: string): Promise<NormalizedResult> {
     const startTime = Date.now();
 
-    if (!this.config.enabled) {
+    if (!this.isEnabled) {
       return okResult('TRACKPOD', []);
     }
 
@@ -91,7 +119,7 @@ export class TrackpodIntegration implements IIntegration {
       }
 
       // Limit results to maxResults
-      const limitedItems = items.slice(0, this.config.maxResults);
+      const limitedItems = items.slice(0, this.maxResults);
 
       return okResult('TRACKPOD', limitedItems, { durationMs });
     } catch (err: any) {
@@ -109,7 +137,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Order/Number/{number}
    */
   async getOrderByNumber(orderNumber: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Order/Number/${encodeURIComponent(orderNumber)}`;
+    const url = `${this.baseUrl}/Order/Number/${encodeURIComponent(orderNumber)}`;
     return this.makeRequest(url);
   }
 
@@ -118,7 +146,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Order/Id/{id}
    */
   async getOrderById(orderId: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Order/Id/${encodeURIComponent(orderId)}`;
+    const url = `${this.baseUrl}/Order/Id/${encodeURIComponent(orderId)}`;
     return this.makeRequest(url);
   }
 
@@ -127,7 +155,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Order/TrackId/{trackId}
    */
   async getOrderByTrackId(trackId: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Order/TrackId/${encodeURIComponent(trackId)}`;
+    const url = `${this.baseUrl}/Order/TrackId/${encodeURIComponent(trackId)}`;
     return this.makeRequest(url);
   }
 
@@ -137,7 +165,7 @@ export class TrackpodIntegration implements IIntegration {
    * @param date - Format: YYYY-MM-DD
    */
   async getOrdersByDate(date: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Order/Date/${date}`;
+    const url = `${this.baseUrl}/Order/Date/${date}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -148,7 +176,7 @@ export class TrackpodIntegration implements IIntegration {
    * @param date - Format: YYYY-MM-DD
    */
   async getOrdersByRouteDate(date: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Order/Route/Date/${date}`;
+    const url = `${this.baseUrl}/Order/Route/Date/${date}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -158,7 +186,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Order/Route/Code/{code}
    */
   async getOrdersByRouteCode(routeCode: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Order/Route/Code/${encodeURIComponent(routeCode)}`;
+    const url = `${this.baseUrl}/Order/Route/Code/${encodeURIComponent(routeCode)}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -169,7 +197,7 @@ export class TrackpodIntegration implements IIntegration {
    * @param date - Format: YYYY-MM-DDTHH:mm:ss (min. request time is UTC - 1 day)
    */
   async getOrdersByStatusDate(date: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Order/Status/Date/${encodeURIComponent(date)}`;
+    const url = `${this.baseUrl}/Order/Status/Date/${encodeURIComponent(date)}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -181,7 +209,7 @@ export class TrackpodIntegration implements IIntegration {
    */
   async getOrdersByNumberList(numbers: string[]): Promise<any[]> {
     const numberList = numbers.slice(0, 25).join(',');
-    const url = `${this.config.baseUrl}/Order/Number/${encodeURIComponent(numberList)}/List`;
+    const url = `${this.baseUrl}/Order/Number/${encodeURIComponent(numberList)}/List`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -195,7 +223,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Route/Code/{code}
    */
   async getRouteByCode(routeCode: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Route/Code/${encodeURIComponent(routeCode)}`;
+    const url = `${this.baseUrl}/Route/Code/${encodeURIComponent(routeCode)}`;
     return this.makeRequest(url);
   }
 
@@ -204,7 +232,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Route/Id/{id}
    */
   async getRouteById(routeId: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Route/Id/${encodeURIComponent(routeId)}`;
+    const url = `${this.baseUrl}/Route/Id/${encodeURIComponent(routeId)}`;
     return this.makeRequest(url);
   }
 
@@ -214,7 +242,7 @@ export class TrackpodIntegration implements IIntegration {
    * @param date - Format: YYYY-MM-DD
    */
   async getRoutesByDate(date: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Route/Date/${date}`;
+    const url = `${this.baseUrl}/Route/Date/${date}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -224,7 +252,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Route/Export/Code
    */
   async getRouteCodesForExport(): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Route/Export/Code`;
+    const url = `${this.baseUrl}/Route/Export/Code`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -234,7 +262,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Route/Export/Id
    */
   async getRouteIdsForExport(): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Route/Export/Id`;
+    const url = `${this.baseUrl}/Route/Export/Id`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -244,7 +272,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Route/Track/Code/{code}
    */
   async getRouteTrackByCode(routeCode: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Route/Track/Code/${encodeURIComponent(routeCode)}`;
+    const url = `${this.baseUrl}/Route/Track/Code/${encodeURIComponent(routeCode)}`;
     return this.makeRequest(url);
   }
 
@@ -253,7 +281,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Route/Track/Id/{id}
    */
   async getRouteTrackById(routeId: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Route/Track/Id/${encodeURIComponent(routeId)}`;
+    const url = `${this.baseUrl}/Route/Track/Id/${encodeURIComponent(routeId)}`;
     return this.makeRequest(url);
   }
 
@@ -266,7 +294,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Vehicle/{id}
    */
   async getVehicleById(vehicleId: string): Promise<any> {
-    const url = `${this.config.baseUrl}/Vehicle/${encodeURIComponent(vehicleId)}`;
+    const url = `${this.baseUrl}/Vehicle/${encodeURIComponent(vehicleId)}`;
     return this.makeRequest(url);
   }
 
@@ -275,7 +303,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /Vehicle
    */
   async getVehicles(): Promise<any[]> {
-    const url = `${this.config.baseUrl}/Vehicle`;
+    const url = `${this.baseUrl}/Vehicle`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -285,7 +313,7 @@ export class TrackpodIntegration implements IIntegration {
    * GET /VehicleCheck/{number}
    */
   async getVehicleCheckByNumber(checkNumber: string): Promise<any> {
-    const url = `${this.config.baseUrl}/VehicleCheck/${encodeURIComponent(checkNumber)}`;
+    const url = `${this.baseUrl}/VehicleCheck/${encodeURIComponent(checkNumber)}`;
     return this.makeRequest(url);
   }
 
@@ -295,7 +323,7 @@ export class TrackpodIntegration implements IIntegration {
    * @param date - Format: YYYY-MM-DD
    */
   async getVehicleChecksByDate(date: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/VehicleCheck/Date/${date}`;
+    const url = `${this.baseUrl}/VehicleCheck/Date/${date}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -307,7 +335,7 @@ export class TrackpodIntegration implements IIntegration {
    * @param date - Format: YYYY-MM-DD
    */
   async getVehicleChecksByNumberAndDate(number: string, date: string): Promise<any[]> {
-    const url = `${this.config.baseUrl}/VehicleCheck/Number/${encodeURIComponent(number)}/Date/${date}`;
+    const url = `${this.baseUrl}/VehicleCheck/Number/${encodeURIComponent(number)}/Date/${date}`;
     const result = await this.makeRequest(url);
     return Array.isArray(result) ? result : [result];
   }
@@ -388,7 +416,7 @@ export class TrackpodIntegration implements IIntegration {
     const res = await fetch(url, {
       method: 'GET',
       headers: this.authHeaders,
-      signal: AbortSignal.timeout(this.config.timeoutMs),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
 
     if (res.status === 401 || res.status === 403) {
