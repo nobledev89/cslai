@@ -333,6 +333,146 @@ async function runCustomRest(
   return okResult('CUSTOM_REST', items, { totalCount: items.length, durationMs: Date.now() - t0 });
 }
 
+async function runTrackpod(
+  config: {
+    apiKey: string;
+    baseUrl?: string;
+    maxResults?: number;
+    timeoutMs?: number;
+  },
+  query: string,
+  t0: number,
+): Promise<NormalizedResult> {
+  const baseUrl = config.baseUrl ?? 'https://api.track-pod.com';
+  const maxResults = config.maxResults ?? 20;
+  const timeoutMs = config.timeoutMs ?? 10000;
+
+  const headers = {
+    'X-API-KEY': config.apiKey,
+    'Accept': 'application/json',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Content-Type': 'application/json',
+  };
+
+  // Try to search for both orders and routes in parallel
+  const results = await Promise.allSettled([
+    // Search orders by number
+    fetch(`${baseUrl}/Order/Number/${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    }),
+    // Search routes by code
+    fetch(`${baseUrl}/Route/Code/${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    }),
+  ]);
+
+  const items: NormalizedResultItem[] = [];
+
+  // Process order result
+  if (results[0].status === 'fulfilled' && results[0].value.ok) {
+    try {
+      const order = (await results[0].value.json()) as {
+        id?: string;
+        number?: string;
+        orderNumber?: string;
+        status?: string;
+        routeCode?: string;
+        route?: { code?: string };
+        address?: string;
+        customerName?: string;
+        customer?: { name?: string };
+        modifiedDate?: string;
+        createdDate?: string;
+      };
+
+      if (order && order.id) {
+        items.push({
+          label: `Order #${order.number || order.orderNumber || query}`,
+          summary: `Status: ${order.status || 'N/A'}, Route: ${order.routeCode || order.route?.code || 'N/A'}`,
+          data: {
+            orderId: order.id,
+            orderNumber: order.number || order.orderNumber,
+            status: order.status,
+            routeCode: order.routeCode || order.route?.code,
+            address: order.address,
+            customerName: order.customerName || order.customer?.name,
+          },
+          timestamp: order.modifiedDate || order.createdDate,
+        });
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }
+
+  // Process route result
+  if (results[1].status === 'fulfilled' && results[1].value.ok) {
+    try {
+      const route = (await results[1].value.json()) as {
+        id?: string;
+        code?: string;
+        status?: string;
+        driver?: { name?: string };
+        vehicle?: { number?: string };
+        orderCount?: number;
+        orders?: Array<unknown>;
+        date?: string;
+        modifiedDate?: string;
+        createdDate?: string;
+      };
+
+      if (route && route.id) {
+        items.push({
+          label: `Route: ${route.code || query}`,
+          summary: `Status: ${route.status || 'N/A'}, Driver: ${route.driver?.name || 'N/A'}, Orders: ${route.orderCount || route.orders?.length || 0}`,
+          data: {
+            routeId: route.id,
+            routeCode: route.code,
+            status: route.status,
+            driverName: route.driver?.name,
+            vehicleNumber: route.vehicle?.number,
+            orderCount: route.orderCount || route.orders?.length,
+            date: route.date,
+          },
+          timestamp: route.modifiedDate || route.createdDate || route.date,
+        });
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }
+
+  // Check for authentication errors
+  for (const result of results) {
+    if (result.status === 'fulfilled' && (result.value.status === 401 || result.value.status === 403)) {
+      return errResult('TRACKPOD', 'TrackPod authentication failed. Please check your API key.', {
+        durationMs: Date.now() - t0,
+      });
+    }
+  }
+
+  // If no results found, return empty success
+  if (items.length === 0) {
+    return okResult('TRACKPOD', [], {
+      totalCount: 0,
+      durationMs: Date.now() - t0,
+      statusMessage: 'No orders or routes found matching the query',
+    });
+  }
+
+  // Limit results
+  const limitedItems = items.slice(0, maxResults);
+
+  return okResult('TRACKPOD', limitedItems, {
+    totalCount: limitedItems.length,
+    durationMs: Date.now() - t0,
+  });
+}
+
 // ─── Dispatch to correct integration runner ───────────────────────────────────
 
 async function runIntegration(
@@ -360,10 +500,11 @@ async function runIntegration(
           t0,
         );
       case 'TRACKPOD':
-        // Feature-flagged stub — returns empty result
-        return errResult('TRACKPOD', 'Trackpod integration is not yet implemented', {
-          durationMs: 0,
-        });
+        return await runTrackpod(
+          config as { apiKey: string; baseUrl?: string; maxResults?: number; timeoutMs?: number },
+          query,
+          t0,
+        );
       default:
         return errResult(type as string, `Unknown integration type: ${type}`, { durationMs: 0 });
     }
