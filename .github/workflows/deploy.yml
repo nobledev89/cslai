@@ -27,6 +27,8 @@ jobs:
             pnpm install --no-frozen-lockfile
             pnpm --filter @company-intel/db exec prisma generate
             pnpm turbo run build
+            # Load environment variables from .env file for migrations
+            if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
             pnpm --filter @company-intel/db exec prisma migrate deploy
             echo "📦 Copying Next.js static assets into standalone output..."
             cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static

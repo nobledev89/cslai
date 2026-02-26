@@ -119,7 +119,7 @@ deploy:
 	pnpm install --no-frozen-lockfile
 	$(MAKE) generate
 	pnpm turbo run build
-	$(MAKE) migrate
+	@if [ -f .env ]; then export $$(grep -v '^#' .env | xargs); fi && $(MAKE) migrate
 	@echo "📦 Copying Next.js static assets into standalone output..."
 	cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
 	@if [ -d "apps/web/public" ]; then cp -r apps/web/public apps/web/.next/standalone/apps/web/public; fi
