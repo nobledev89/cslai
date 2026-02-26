@@ -27,8 +27,10 @@ export class QueueProducer {
   }
 
   async enqueueEnrichment(payload: EnrichmentJobPayload): Promise<string> {
+    // BullMQ doesn't allow colons in job IDs, so use dashes instead
+    const jobId = `${payload.tenantId}-${payload.slack?.threadTs ?? Date.now()}`.replace(/:/g, '-');
     const job = await this.queue.add('enrich', payload, {
-      jobId: `${payload.tenantId}:${payload.slack?.threadTs ?? Date.now()}`,
+      jobId,
     });
     this.logger.log(`Enqueued enrichment job ${job.id} for tenant ${payload.tenantId}`);
     return job.id ?? '';
