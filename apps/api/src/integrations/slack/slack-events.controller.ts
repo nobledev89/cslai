@@ -115,9 +115,19 @@ export class SlackEventsController {
 
       this.logger.log(`Slack mention from team=${team_id} channel=${event.channel}`);
 
+      // Look up the actual tenant ID from SlackWorkspace
+      const workspace = await prisma.slackWorkspace.findFirst({
+        where: { teamId: team_id },
+      });
+
+      if (!workspace) {
+        this.logger.warn(`SlackWorkspace not found for team=${team_id} - cannot process mention`);
+        return { ok: true }; // Return ok to prevent retries
+      }
+
       try {
         await this.queueProducer.enqueueEnrichment({
-          tenantId: team_id, // resolved to actual tenantId by worker
+          tenantId: workspace.tenantId, // Use actual tenant ID from database
           threadKey: `slack:${team_id}:${event.channel}:${event.thread_ts ?? event.ts}`,
           userMessage: event.text ?? '',
           slack: {
