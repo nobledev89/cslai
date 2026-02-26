@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# backup-postgres.sh — Dump the production PostgreSQL database
+# backup-postgres.sh — Dump the PostgreSQL database
 #
 # Usage:
 #   ./infra/scripts/backup-postgres.sh [output-dir]
@@ -10,7 +10,7 @@
 #   Filename:         company_intel_YYYYMMDD_HHMMSS.sql.gz
 #
 # Requires:
-#   - Docker Compose stack must be running (postgres service)
+#   - Docker Compose dev stack must be running (postgres service)
 #   - POSTGRES_PASSWORD env var (or set in .env)
 # =============================================================================
 
@@ -25,9 +25,9 @@ TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 FILENAME="company_intel_${TIMESTAMP}.sql.gz"
 BACKUP_PATH="${OUTPUT_DIR}/${FILENAME}"
 
-COMPOSE_FILE="${REPO_ROOT}/infra/docker-compose.yml"
+COMPOSE_FILE="${REPO_ROOT}/infra/docker-compose.dev.yml"
 POSTGRES_USER="${POSTGRES_USER:-intel}"
-POSTGRES_DB="${POSTGRES_DB:-company_intel}"
+POSTGRES_DB="${POSTGRES_DB:-company_intel_dev}"
 
 # ─── Preflight ──────────────────────────────────────────────────────────────────
 if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
@@ -37,10 +37,8 @@ if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
   fi
 fi
 
-if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
-  echo "❌ ERROR: POSTGRES_PASSWORD is not set. Export it or add to .env" >&2
-  exit 1
-fi
+# Dev postgres runs without a password; default to empty string if not set
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 
 mkdir -p "${OUTPUT_DIR}"
 

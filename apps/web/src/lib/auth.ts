@@ -20,12 +20,12 @@ export async function login(email: string, password: string): Promise<string> {
 export async function register(
   email: string,
   password: string,
-  tenantSlug: string,
+  companyName: string,
   name?: string,
 ): Promise<string> {
   const { data } = await api.post<{ accessToken: string; expiresIn: number }>(
     '/auth/register',
-    { email, password, tenantSlug, name },
+    { email, password, companyName, name },
   );
   Cookies.set('access_token', data.accessToken, { expires: 1 / 96 });
   return data.accessToken;

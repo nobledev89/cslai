@@ -4,9 +4,9 @@
 # =============================================================================
 
 .PHONY: help dev build lint type-check test clean \
-        install migrate migrate-reset seed generate \
-        docker-dev docker-prod docker-down \
-        deploy backup restore logs
+        install migrate migrate-dev migrate-reset seed generate studio \
+        docker-dev docker-down \
+        deploy backup restore logs pm2-status pm2-restart pm2-stop pm2-start
 
 # Default target
 help:
@@ -25,20 +25,25 @@ help:
 	@echo ""
 	@echo "  Database"
 	@echo "    make generate      Regenerate Prisma client from schema"
-	@echo "    make migrate       Run pending Prisma migrations"
+	@echo "    make migrate       Run pending Prisma migrations (production)"
+	@echo "    make migrate-dev   Create + apply a new migration (development)"
 	@echo "    make migrate-reset Drop DB + re-run all migrations (DEV only)"
 	@echo "    make seed          Seed DB with super-admin tenant + user"
+	@echo "    make studio        Open Prisma Studio (browser DB GUI)"
 	@echo ""
-	@echo "  Docker"
-	@echo "    make docker-dev    Start local dev stack (Postgres + Redis)"
-	@echo "    make docker-prod   Start full production stack"
-	@echo "    make docker-down   Stop and remove containers"
+	@echo "  Docker (PostgreSQL + Redis only)"
+	@echo "    make docker-dev    Start Postgres + Redis in Docker"
+	@echo "    make docker-down   Stop and remove Docker containers"
 	@echo ""
-	@echo "  Production"
-	@echo "    make deploy        Pull latest + rebuild + restart on server"
+	@echo "  Production (PM2)"
+	@echo "    make deploy        Pull latest + rebuild + restart PM2 services"
+	@echo "    make pm2-status    Show PM2 process status"
+	@echo "    make pm2-restart   Restart all PM2 processes"
+	@echo "    make pm2-stop      Stop all PM2 processes"
+	@echo "    make pm2-start     Start PM2 processes from ecosystem.config.js"
+	@echo "    make logs          Tail all PM2 process logs"
 	@echo "    make backup        Dump Postgres to ./backups/"
-	@echo "    make restore       Restore latest backup (interactive)"
-	@echo "    make logs          Tail all container logs"
+	@echo "    make restore       Restore a Postgres backup (interactive)"
 	@echo ""
 
 # =============================================================================
@@ -94,26 +99,18 @@ studio:
 	pnpm --filter @company-intel/db exec prisma studio
 
 # =============================================================================
-# Docker
+# Docker (PostgreSQL + Redis only)
 # =============================================================================
 
 docker-dev:
 	docker compose -f infra/docker-compose.dev.yml up -d
 	@echo "✅ Postgres + Redis running. Apply migrations: make migrate"
 
-docker-prod:
-	docker compose -f infra/docker-compose.yml up -d --build
-	@echo "✅ Production stack started."
-
 docker-down:
-	docker compose -f infra/docker-compose.yml down
 	docker compose -f infra/docker-compose.dev.yml down
 
-docker-logs:
-	docker compose -f infra/docker-compose.yml logs -f
-
 # =============================================================================
-# Production deploy (run on server)
+# Production deploy (run on server — uses PM2)
 # =============================================================================
 
 deploy:
@@ -129,6 +126,21 @@ deploy:
 	pm2 save
 	@echo "✅ Deploy complete."
 
+pm2-status:
+	pm2 status
+
+pm2-restart:
+	pm2 restart all --update-env
+
+pm2-stop:
+	pm2 stop all
+
+pm2-start:
+	pm2 start ecosystem.config.js
+
+logs:
+	pm2 logs
+
 # =============================================================================
 # Backup / Restore
 # =============================================================================
@@ -138,10 +150,3 @@ backup:
 
 restore:
 	bash infra/scripts/restore-postgres.sh
-
-# =============================================================================
-# Logs
-# =============================================================================
-
-logs:
-	docker compose -f infra/docker-compose.yml logs -f --tail=100

@@ -15,6 +15,7 @@ import { RunsModule } from './runs/runs.module';
 import { LlmModule } from './llm/llm.module';
 import { QueueModule } from './queue/queue.module';
 import { HealthModule } from './health/health.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { HealthModule } from './health/health.module';
     LlmModule,
     QueueModule,
     HealthModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

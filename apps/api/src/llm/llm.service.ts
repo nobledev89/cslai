@@ -1,11 +1,13 @@
 // =============================================================================
-// LLM Service — provider-agnostic: openai / anthropic / gemini
+// LLM Service — provider-agnostic with DB-driven fallback chain
+// Providers are tried in priority order; if one fails the next is used.
 // =============================================================================
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SettingsService, LlmProvider, LlmProviderConfig } from '../settings/settings.service';
 
-export type LlmProvider = 'openai' | 'anthropic' | 'gemini';
+export { LlmProvider };
 
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant';
@@ -17,37 +19,77 @@ export interface LlmOptions {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  /** If set, the tenant's saved settings + fallback chain will be used */
+  tenantId?: string;
 }
 
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   async chat(messages: LlmMessage[], options: LlmOptions = {}): Promise<string> {
-    const provider = options.provider ?? (this.config.get<string>('LLM_PROVIDER', 'openai') as LlmProvider);
+    // ── If tenantId provided, use DB-stored provider chain ───────────────────
+    if (options.tenantId) {
+      const ordered = await this.settingsService.getOrderedProviders(options.tenantId);
+      if (ordered.length > 0) {
+        return this.chatWithFallback(messages, ordered, options);
+      }
+      // No DB providers configured — fall through to env-var defaults
+    }
 
+    // ── Env-var fallback (legacy / dev) ──────────────────────────────────────
+    const provider = options.provider ?? (this.config.get<string>('DEFAULT_LLM_PROVIDER', 'openai') as LlmProvider);
     switch (provider) {
-      case 'openai':
-        return this.chatOpenAI(messages, options);
-      case 'anthropic':
-        return this.chatAnthropic(messages, options);
-      case 'gemini':
-        return this.chatGemini(messages, options);
-      default:
-        throw new Error(`Unknown LLM provider: ${provider}`);
+      case 'openai':    return this.chatOpenAI(messages, options, this.config.get<string>('OPENAI_API_KEY', ''));
+      case 'anthropic': return this.chatAnthropic(messages, options, this.config.get<string>('ANTHROPIC_API_KEY', ''));
+      case 'gemini':    return this.chatGemini(messages, options, this.config.get<string>('GOOGLE_GEMINI_API_KEY', ''));
+      default:          throw new Error(`Unknown LLM provider: ${provider}`);
     }
   }
 
+  /** Try each provider in priority order; move to the next on failure */
+  private async chatWithFallback(
+    messages: LlmMessage[],
+    providers: LlmProviderConfig[],
+    options: LlmOptions,
+  ): Promise<string> {
+    let lastError: Error | null = null;
+
+    for (const p of providers) {
+      try {
+        this.logger.log(`Trying LLM provider: ${p.provider} / ${p.model}`);
+        const model = options.model ?? p.model;
+        switch (p.provider) {
+          case 'openai':    return await this.chatOpenAI(messages, { ...options, model }, p.apiKey);
+          case 'anthropic': return await this.chatAnthropic(messages, { ...options, model }, p.apiKey);
+          case 'gemini':    return await this.chatGemini(messages, { ...options, model }, p.apiKey);
+        }
+      } catch (err: any) {
+        this.logger.warn(`LLM provider ${p.provider} failed: ${err?.message}. Trying next…`);
+        lastError = err;
+      }
+    }
+
+    throw lastError ?? new Error('All LLM providers failed');
+  }
+
   // ─── OpenAI ──────────────────────────────────────────────────────────────
-  private async chatOpenAI(messages: LlmMessage[], options: LlmOptions): Promise<string> {
-    const apiKey = this.config.getOrThrow<string>('OPENAI_API_KEY');
-    const model = options.model ?? this.config.get<string>('OPENAI_MODEL', 'gpt-4o-mini');
+  private async chatOpenAI(
+    messages: LlmMessage[],
+    options: LlmOptions,
+    apiKey: string,
+  ): Promise<string> {
+    const key = apiKey || this.config.getOrThrow<string>('OPENAI_API_KEY');
+    const model = options.model ?? this.config.get<string>('DEFAULT_LLM_MODEL', 'gpt-5-mini');
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         messages,
@@ -68,11 +110,14 @@ export class LlmService {
   }
 
   // ─── Anthropic (Claude) ──────────────────────────────────────────────────
-  private async chatAnthropic(messages: LlmMessage[], options: LlmOptions): Promise<string> {
-    const apiKey = this.config.getOrThrow<string>('ANTHROPIC_API_KEY');
-    const model = options.model ?? this.config.get<string>('ANTHROPIC_MODEL', 'claude-3-5-haiku-20241022');
+  private async chatAnthropic(
+    messages: LlmMessage[],
+    options: LlmOptions,
+    apiKey: string,
+  ): Promise<string> {
+    const key = apiKey || this.config.getOrThrow<string>('ANTHROPIC_API_KEY');
+    const model = options.model ?? this.config.get<string>('ANTHROPIC_MODEL', 'claude-sonnet-4-6');
 
-    // Separate system message
     const systemMsg = messages.find((m) => m.role === 'system')?.content;
     const chatMessages = messages.filter((m) => m.role !== 'system');
 
@@ -86,7 +131,7 @@ export class LlmService {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
+        'x-api-key': key,
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
@@ -105,9 +150,13 @@ export class LlmService {
   }
 
   // ─── Google Gemini ───────────────────────────────────────────────────────
-  private async chatGemini(messages: LlmMessage[], options: LlmOptions): Promise<string> {
-    const apiKey = this.config.getOrThrow<string>('GEMINI_API_KEY');
-    const model = options.model ?? this.config.get<string>('GEMINI_MODEL', 'gemini-1.5-flash');
+  private async chatGemini(
+    messages: LlmMessage[],
+    options: LlmOptions,
+    apiKey: string,
+  ): Promise<string> {
+    const key = apiKey || this.config.getOrThrow<string>('GOOGLE_GEMINI_API_KEY');
+    const model = options.model ?? this.config.get<string>('GEMINI_MODEL', 'gemini-2.5-flash');
 
     const contents = messages
       .filter((m) => m.role !== 'system')
@@ -129,7 +178,7 @@ export class LlmService {
       body.systemInstruction = { parts: [{ text: systemInstruction }] };
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

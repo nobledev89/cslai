@@ -16,7 +16,7 @@ export class RegisterDto {
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ example: 'acme-corp' })
+  @ApiProperty({ example: 'Acme Corp' })
   @IsString()
-  tenantSlug: string;
+  companyName: string;
 }

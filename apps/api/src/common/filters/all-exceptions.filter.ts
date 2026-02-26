@@ -19,10 +19,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    const exceptionResponse =
       exception instanceof HttpException
         ? exception.getResponse()
         : 'Internal server error';
+
+    // NestJS HttpException.getResponse() may return a string or an object
+    // like { statusCode, message, error }. Extract just the message string.
+    const message =
+      typeof exceptionResponse === 'string'
+        ? exceptionResponse
+        : Array.isArray((exceptionResponse as any)?.message)
+          ? (exceptionResponse as any).message.join(', ')
+          : (exceptionResponse as any)?.message ?? 'Internal server error';
 
     response.status(status).json({
       statusCode: status,

@@ -9,7 +9,7 @@ interface RegisterForm {
   email: string;
   password: string;
   name: string;
-  tenantSlug: string;
+  companyName: string;
 }
 
 export default function RegisterPage() {
@@ -23,10 +23,17 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
     try {
-      await registerUser(data.email, data.password, data.tenantSlug, data.name);
+      await registerUser(data.email, data.password, data.companyName, data.name);
       router.push('/');
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Registration failed.');
+      const msg = err?.response?.data?.message;
+      setError(
+        typeof msg === 'string'
+          ? msg
+          : Array.isArray(msg)
+            ? msg.join(', ')
+            : 'Registration failed.',
+      );
     } finally {
       setLoading(false);
     }
@@ -38,7 +45,7 @@ export default function RegisterPage() {
         <div className="card p-8">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
-            <p className="text-gray-500 mt-1 text-sm">Join an existing tenant</p>
+            <p className="text-gray-500 mt-1 text-sm">Sign up to get started</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -68,14 +75,13 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Slug</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
               <input
                 type="text"
                 className="input"
-                placeholder="acme-corp"
-                {...register('tenantSlug', { required: true })}
+                placeholder="Acme Corp"
+                {...register('companyName', { required: true })}
               />
-              <p className="text-xs text-gray-400 mt-1">Ask your admin for the tenant slug</p>
             </div>
 
             {error && (

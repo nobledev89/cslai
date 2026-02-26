@@ -12,8 +12,7 @@
 #     Always verify the backup is valid before restoring to production.
 #
 # Requires:
-#   - Docker Compose stack must be running (postgres service)
-#   - POSTGRES_PASSWORD env var (or set in .env)
+#   - Docker Compose dev stack must be running (postgres service)
 # =============================================================================
 
 set -euo pipefail
@@ -23,9 +22,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 BACKUP_FILE="${1:-}"
-COMPOSE_FILE="${REPO_ROOT}/infra/docker-compose.yml"
+COMPOSE_FILE="${REPO_ROOT}/infra/docker-compose.dev.yml"
 POSTGRES_USER="${POSTGRES_USER:-intel}"
-POSTGRES_DB="${POSTGRES_DB:-company_intel}"
+POSTGRES_DB="${POSTGRES_DB:-company_intel_dev}"
 
 # ─── Validation ────────────────────────────────────────────────────────────────
 if [[ -z "${BACKUP_FILE}" ]]; then
@@ -44,19 +43,6 @@ fi
 
 if [[ ! -f "${BACKUP_FILE}" ]]; then
   echo "❌ ERROR: Backup file not found: ${BACKUP_FILE}" >&2
-  exit 1
-fi
-
-# ─── Load env ──────────────────────────────────────────────────────────────────
-if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
-  if [[ -f "${REPO_ROOT}/.env" ]]; then
-    # shellcheck disable=SC1091
-    source "${REPO_ROOT}/.env"
-  fi
-fi
-
-if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
-  echo "❌ ERROR: POSTGRES_PASSWORD is not set. Export it or add to .env" >&2
   exit 1
 fi
 

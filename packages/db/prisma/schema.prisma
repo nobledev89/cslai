@@ -30,6 +30,7 @@ model Tenant {
   threadMemories    ThreadMemory[]
   runs              Run[]
   errorLogs         ErrorLog[]
+  setting           TenantSetting?
 
   @@map("tenants")
 }
@@ -125,6 +126,19 @@ model IntegrationConfig {
 // ─────────────────────────────────────────────────────────────────────────────
 // Slack Workspaces (per-tenant)
 // ─────────────────────────────────────────────────────────────────────────────
+
+model TenantSetting {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique @map("tenant_id")
+  /// Encrypted JSON blob — LlmSettings shape (providers array with keys, models, priorities)
+  llmConfigEnc String?  @map("llm_config_enc")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
 
 model SlackWorkspace {
   id             String   @id @default(cuid())

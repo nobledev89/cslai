@@ -62,10 +62,16 @@ export class AuthService {
 
   // ─── Register ─────────────────────────────────────────────────────────────
   async register(dto: RegisterDto) {
+    const tenantSlug = dto.companyName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
     const tenant = await prisma.tenant.findUnique({
-      where: { slug: dto.tenantSlug },
+      where: { slug: tenantSlug },
     });
-    if (!tenant) throw new NotFoundException(`Tenant '${dto.tenantSlug}' not found`);
+    if (!tenant) throw new NotFoundException(`Company '${dto.companyName}' not found`);
 
     const existing = await prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
