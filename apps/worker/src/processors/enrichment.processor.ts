@@ -105,13 +105,13 @@ async function callLlm(messages: LlmMessage[], tenantId: string): Promise<string
 
   // ── Anthropic ────────────────────────────────────────────────────────────────
   if (provider === 'anthropic') {
-    const apiKey = process.env['ANTHROPIC_API_KEY'];
+    const apiKey = anthropicKey;
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
-    const model = process.env['ANTHROPIC_MODEL'] ?? 'claude-3-5-haiku-20241022';
+    const modelName = model || process.env['ANTHROPIC_MODEL'] || 'claude-3-5-haiku-20241022';
 
     const systemMsg = messages.find((m) => m.role === 'system')?.content;
     const chatMessages = messages.filter((m) => m.role !== 'system');
-    const body: Record<string, unknown> = { model, max_tokens: 1024, messages: chatMessages };
+    const body: Record<string, unknown> = { model: modelName, max_tokens: 1024, messages: chatMessages };
     if (systemMsg) body['system'] = systemMsg;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -133,9 +133,9 @@ async function callLlm(messages: LlmMessage[], tenantId: string): Promise<string
 
   // ── Gemini ───────────────────────────────────────────────────────────────────
   if (provider === 'gemini') {
-    const apiKey = process.env['GEMINI_API_KEY'];
+    const apiKey = geminiKey;
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
-    const model = process.env['GEMINI_MODEL'] ?? 'gemini-1.5-flash';
+    const modelName = model || process.env['GEMINI_MODEL'] || 'gemini-1.5-flash';
 
     const systemInstruction = messages.find((m) => m.role === 'system')?.content;
     const contents = messages
@@ -151,7 +151,7 @@ async function callLlm(messages: LlmMessage[], tenantId: string): Promise<string
     };
     if (systemInstruction) body['systemInstruction'] = { parts: [{ text: systemInstruction }] };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
