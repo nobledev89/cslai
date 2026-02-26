@@ -58,7 +58,13 @@ export class SlackEventsController {
     @Headers('x-slack-request-timestamp') ts: string,
     @Body() payload: SlackPayload,
   ) {
-    // ─── Verify Slack signature ─────────────────────────────────────────────
+    // ─── URL verification handshake (no signature check needed) ─────────────
+    if (payload.type === 'url_verification') {
+      this.logger.log('Slack URL verification challenge received');
+      return { challenge: payload.challenge };
+    }
+
+    // ─── Verify Slack signature for all other events ───────────────────────
     const signingSecret = this.config.get<string>('SLACK_SIGNING_SECRET', '');
     if (signingSecret) {
       const rawBody = req.rawBody?.toString() ?? JSON.stringify(payload);
@@ -71,11 +77,6 @@ export class SlackEventsController {
         this.logger.warn('Slack signature verification failed');
         return { ok: false };
       }
-    }
-
-    // ─── URL verification handshake ─────────────────────────────────────────
-    if (payload.type === 'url_verification') {
-      return { challenge: payload.challenge };
     }
 
     // ─── Event callback ─────────────────────────────────────────────────────
