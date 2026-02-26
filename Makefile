@@ -115,7 +115,9 @@ docker-down:
 
 deploy:
 	@echo "🚀 Deploying Company Intel Bot..."
-	git pull origin main
+	@echo "🔄 Fetching latest changes..."
+	git fetch origin main
+	git reset --hard origin/main
 	pnpm install --no-frozen-lockfile
 	$(MAKE) generate
 	pnpm turbo run build
