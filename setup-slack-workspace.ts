@@ -1,13 +1,21 @@
 // Quick script to create SlackWorkspace record
-// Run this on your server with: node setup-slack-workspace.js
+// Run this on your server with: npx tsx setup-slack-workspace.ts
 
-const { PrismaClient } = require('./node_modules/@prisma/client');
-const { encryptObject } = require('./packages/db/dist/encryption');
+import * as dotenv from 'dotenv';
+dotenv.config();
 
-// Load environment variables
-require('dotenv').config({ path: './.env' });
+import { prisma, encryptObject } from './packages/db/src/index';
 
-const prisma = new PrismaClient();
+// Slack team details - Configure these for your workspace
+const SLACK_TEAM_ID = process.env.SLACK_TEAM_ID || 'T01GVPQL2BG'; // Your Slack team ID from logs
+const SLACK_TEAM_NAME = process.env.SLACK_TEAM_NAME || 'Corporate Spec Workspace'; // Your workspace name
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || ''; // Bot token from env
+
+if (!SLACK_BOT_TOKEN) {
+  console.error('❌ Error: SLACK_BOT_TOKEN environment variable is required');
+  console.error('Please set it in your .env file or pass it when running the script');
+  process.exit(1);
+}
 
 async function setup() {
   try {
@@ -24,11 +32,6 @@ async function setup() {
 
     const tenant = tenants[0]; // Use first tenant
     console.log(`\nUsing tenant: ${tenant.name} (${tenant.id})\n`);
-
-    // Slack team details (UPDATE THESE!)
-    const SLACK_TEAM_ID = 'T01GVPQL2BG'; // Your Slack team ID from logs
-    const SLACK_TEAM_NAME = 'Your Workspace Name'; // Replace with your workspace name
-    const SLACK_BOT_TOKEN = 'xoxb-your-actual-bot-token-here'; // Get from Slack app OAuth page
 
     // Check if SlackWorkspace already exists
     const existing = await prisma.slackWorkspace.findFirst({
