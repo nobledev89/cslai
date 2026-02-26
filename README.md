@@ -8,6 +8,7 @@ A multi-tenant company intelligence Slack bot — ask your Slack bot questions a
 
 ## Table of Contents
 
+- [Development Workflow](#development-workflow)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Repository Layout](#repository-layout)
@@ -23,6 +24,54 @@ A multi-tenant company intelligence Slack bot — ask your Slack bot questions a
 - [All Make Targets](#all-make-targets)
 - [Adding a New Integration](#adding-a-new-integration)
 - [Security Notes](#security-notes)
+
+---
+
+## Development Workflow
+
+> 📖 **Full step-by-step instructions are in [DEPLOYMENT.md](./DEPLOYMENT.md).**
+
+The project uses a **local-dev → GitHub → EC2** workflow. You never edit files directly on the server.
+
+```
+Windows machine  (D:\CSLAI)   ← code here, run make dev
+       │
+       │  git push origin main
+       ▼
+GitHub  (https://github.com/nobledev89/cslai)
+       │
+       │  ssh ubuntu@18.175.106.89, then: make deploy
+       ▼
+AWS EC2  (18.175.106.89)  →  https://cslai.corporatespec.com
+```
+
+### Quick steps
+
+1. **Clone locally** (one-time, on your Windows machine):
+   ```powershell
+   git clone https://github.com/nobledev89/cslai.git D:\CSLAI
+   cd D:\CSLAI && pnpm install
+   ```
+
+2. **Develop** — edit files in `D:\CSLAI`, run `make dev` for hot-reload.
+
+3. **Update `README.md`** whenever you add features, change APIs, or update env vars.
+
+4. **Commit & push**:
+   ```powershell
+   git add .
+   git commit -m "feat: describe your change"
+   git push origin main
+   ```
+
+5. **Deploy to EC2**:
+   ```powershell
+   ssh ubuntu@18.175.106.89
+   # then on the server:
+   cd /home/ubuntu/cslai && make deploy
+   ```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for full details including SSH key setup, rollback, secret rotation, and database migrations.
 
 ---
 
