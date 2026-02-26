@@ -117,6 +117,7 @@ deploy:
 	@echo "🚀 Deploying Company Intel Bot..."
 	git pull origin main
 	pnpm install --no-frozen-lockfile
+	$(MAKE) generate
 	pnpm turbo run build
 	$(MAKE) migrate
 	@echo "📦 Copying Next.js static assets into standalone output..."

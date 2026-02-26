@@ -25,6 +25,7 @@ jobs:
             cd /home/ubuntu/cslai
             git pull origin main
             pnpm install --no-frozen-lockfile
+            pnpm --filter @company-intel/db exec prisma generate
             pnpm turbo run build
             pnpm --filter @company-intel/db exec prisma migrate deploy
             echo "📦 Copying Next.js static assets into standalone output..."
