@@ -37,19 +37,48 @@ import { errResult, okResult } from '@company-intel/shared';
 
 type LlmMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
-async function callLlm(messages: LlmMessage[]): Promise<string> {
-  const provider = process.env['LLM_PROVIDER'] ?? 'openai';
+async function callLlm(messages: LlmMessage[], tenantId: string): Promise<string> {
+  // Try to get LLM settings from database first
+  let provider = process.env['LLM_PROVIDER'] ?? 'openai';
+  let openaiKey = process.env['OPENAI_API_KEY'];
+  let anthropicKey = process.env['ANTHROPIC_API_KEY'];
+  let geminiKey = process.env['GEMINI_API_KEY'];
+  let model = '';
+
+  try {
+    const settings = await prisma.tenantSetting.findUnique({
+      where: { tenantId },
+    });
+    
+    if (settings?.llmConfigEnc) {
+      const llmConfig = decryptObject<{
+        provider?: string;
+        model?: string;
+        openaiApiKey?: string;
+        anthropicApiKey?: string;
+        geminiApiKey?: string;
+      }>(settings.llmConfigEnc);
+      
+      provider = llmConfig.provider || provider;
+      model = llmConfig.model || '';
+      openaiKey = llmConfig.openaiApiKey || openaiKey;
+      anthropicKey = llmConfig.anthropicApiKey || anthropicKey;
+      geminiKey = llmConfig.geminiApiKey || geminiKey;
+    }
+  } catch (error) {
+    // Fallback to env vars if database fetch fails
+  }
 
   // ── OpenAI ──────────────────────────────────────────────────────────────────
   if (provider === 'openai') {
-    const apiKey = process.env['OPENAI_API_KEY'];
-    if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
-    const model = process.env['OPENAI_MODEL'] ?? 'gpt-4o-mini';
+    const apiKey = openaiKey;
+    if (!apiKey || apiKey === 'sk-changeme') throw new Error('OPENAI_API_KEY is not configured');
+    const modelName = model || process.env['OPENAI_MODEL'] || 'gpt-4o-mini';
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: 1024, temperature: 0.7 }),
+      body: JSON.stringify({ model: modelName, messages, max_tokens: 1024, temperature: 0.7 }),
     });
     if (!res.ok) {
       const txt = await res.text();
@@ -720,7 +749,7 @@ export async function processEnrichment(
     // ── 7. Call LLM ───────────────────────────────────────────────────────────
     let responseText = '';
     try {
-      responseText = await callLlm(llmMessages);
+      responseText = await callLlm(llmMessages, payload.tenantId);
       logger.info({ runId: run.id, provider: process.env['LLM_PROVIDER'] ?? 'openai' }, 'LLM responded');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown LLM error';

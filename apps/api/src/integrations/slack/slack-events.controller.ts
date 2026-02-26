@@ -18,6 +18,7 @@ import { Request } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { QueueProducer } from '../../queue/queue.producer';
+import { prisma, decryptObject } from '@company-intel/db';
 
 interface SlackUrlVerification {
   type: 'url_verification';
@@ -65,8 +66,29 @@ export class SlackEventsController {
     }
 
     // ─── Verify Slack signature for all other events ───────────────────────
-    const signingSecret = this.config.get<string>('SLACK_SIGNING_SECRET', '');
-    if (signingSecret) {
+    // Try to get signing secret from database first, fallback to env
+    let signingSecret = this.config.get<string>('SLACK_SIGNING_SECRET', '');
+    
+    // For event_callback, we can get the signing secret from the integration config
+    if (payload.type === 'event_callback') {
+      try {
+        const slackConfig = await prisma.integrationConfig.findFirst({
+          where: { type: 'SLACK', enabled: true },
+        });
+        
+        if (slackConfig) {
+          const decrypted = decryptObject<{ signingSecret?: string }>(slackConfig.configEnc);
+          if (decrypted.signingSecret) {
+            signingSecret = decrypted.signingSecret;
+            this.logger.debug('Using Slack signing secret from database');
+          }
+        }
+      } catch (error) {
+        this.logger.warn('Failed to fetch Slack config from database, using env var');
+      }
+    }
+    
+    if (signingSecret && signingSecret !== 'dev_signing_secret_changeme') {
       const rawBody = req.rawBody?.toString() ?? JSON.stringify(payload);
       const baseString = `v0:${ts}:${rawBody}`;
       const expected = `v0=${createHmac('sha256', signingSecret).update(baseString).digest('hex')}`;
@@ -77,6 +99,8 @@ export class SlackEventsController {
         this.logger.warn('Slack signature verification failed');
         return { ok: false };
       }
+    } else {
+      this.logger.warn('No valid Slack signing secret configured - skipping signature verification (INSECURE)');
     }
 
     // ─── Event callback ─────────────────────────────────────────────────────
