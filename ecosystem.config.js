@@ -39,7 +39,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
-        NEXT_PUBLIC_API_URL: 'https://api.cslai.corporatespec.com',
+        NEXT_PUBLIC_API_URL: 'https://cslai.corporatespec.com',
       },
     },
     {

@@ -3,10 +3,27 @@
 # Caddy automatically obtains and renews TLS certificates via Let's Encrypt.
 # =============================================================================
 
-# ─── Admin UI ─────────────────────────────────────────────────────────────────
+# ─── Main Domain (UI + API) ───────────────────────────────────────────────────
 cslai.corporatespec.com {
-    # Proxy to Next.js web app
-    reverse_proxy localhost:3000
+    # API endpoints - proxy to NestJS API
+    handle /api/* {
+        reverse_proxy localhost:3001
+    }
+
+    # Health check endpoint
+    handle /health {
+        reverse_proxy localhost:3001
+    }
+
+    # Slack integration endpoints
+    handle /integrations/* {
+        reverse_proxy localhost:3001
+    }
+
+    # Everything else - proxy to Next.js web app
+    handle {
+        reverse_proxy localhost:3000
+    }
 
     # Security headers
     header {
@@ -14,26 +31,6 @@ cslai.corporatespec.com {
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"
-        -Server
-    }
-
-    # Access logs
-    log {
-        output stdout
-        format json
-        level INFO
-    }
-}
-
-# ─── API ──────────────────────────────────────────────────────────────────────
-api.cslai.corporatespec.com {
-    # Proxy to NestJS API
-    reverse_proxy localhost:3001
-
-    # Security headers
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
         -Server
     }
 
