@@ -83,6 +83,23 @@ export const TrackpodConfigSchema = z.object({
 
 export type TrackpodConfig = z.infer<typeof TrackpodConfigSchema>;
 
+// ─── Xero ─────────────────────────────────────────────────────────────────────
+
+export const XeroConfigSchema = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+  tenantId: z.string().min(1),
+  /** Stored after OAuth flow completes */
+  accessToken: z.string().optional(),
+  refreshToken: z.string().optional(),
+  tokenExpiry: z.number().optional(),
+  /** Max items to return per search */
+  maxResults: z.number().int().min(1).max(100).default(10),
+  timeoutMs: z.number().int().min(1000).max(30000).default(10000),
+});
+
+export type XeroConfig = z.infer<typeof XeroConfigSchema>;
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 export const IntegrationConfigSchemas = {
@@ -91,6 +108,7 @@ export const IntegrationConfigSchemas = {
   GMAIL: GmailConfigSchema,
   CUSTOM_REST: CustomRestConfigSchema,
   TRACKPOD: TrackpodConfigSchema,
+  XERO: XeroConfigSchema,
 } as const;
 
 export type IntegrationConfigMap = {
@@ -99,4 +117,5 @@ export type IntegrationConfigMap = {
   GMAIL: GmailConfig;
   CUSTOM_REST: CustomRestConfig;
   TRACKPOD: TrackpodConfig;
+  XERO: XeroConfig;
 };

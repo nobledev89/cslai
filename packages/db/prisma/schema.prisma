@@ -101,6 +101,7 @@ enum IntegrationType {
   GMAIL
   CUSTOM_REST
   TRACKPOD
+  XERO
 }
 
 model IntegrationConfig {

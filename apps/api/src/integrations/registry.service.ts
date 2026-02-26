@@ -6,6 +6,7 @@ import { WooCommerceIntegration } from './woocommerce/woocommerce.integration';
 import { GmailIntegration } from './gmail/gmail.integration';
 import { CustomRestIntegration } from './custom-rest/custom-rest.integration';
 import { TrackpodIntegration } from './trackpod/trackpod.integration';
+import { XeroIntegration } from './xero/xero.integration';
 
 /**
  * Maps IntegrationType enum → concrete integration handler instance.
@@ -25,6 +26,8 @@ export class RegistryService {
         return new CustomRestIntegration(config as any);
       case 'TRACKPOD':
         return new TrackpodIntegration(config as any);
+      case 'XERO':
+        return new XeroIntegration(config as any);
       default:
         throw new Error(`Unknown integration type: ${type}`);
     }
