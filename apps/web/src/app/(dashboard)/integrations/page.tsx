@@ -318,11 +318,19 @@ export default function IntegrationsPage() {
 
               <div className="flex items-center gap-4">
                 {int.testStatus && (
-                  <span className={`flex items-center gap-1 text-sm ${
-                    int.testStatus === 'ok' ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                  <span 
+                    className={`flex items-center gap-1 text-sm ${
+                      int.testStatus === 'ok' ? 'text-green-600' : 'text-red-600'
+                    }`}
+                    title={int.testStatus !== 'ok' ? int.testStatus : undefined}
+                  >
                     {int.testStatus === 'ok' ? <CheckCircle size={14} /> : <XCircle size={14} />}
                     {int.testStatus === 'ok' ? 'Connected' : 'Error'}
+                    {int.testStatus !== 'ok' && int.testStatus !== 'error' && (
+                      <span className="text-xs text-red-500 ml-1">
+                        ({int.testStatus.replace('error: ', '')})
+                      </span>
+                    )}
                   </span>
                 )}
 
