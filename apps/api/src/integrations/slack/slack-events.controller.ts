@@ -115,19 +115,25 @@ export class SlackEventsController {
 
       this.logger.log(`Slack mention from team=${team_id} channel=${event.channel}`);
 
-      await this.queueProducer.enqueueEnrichment({
-        tenantId: team_id, // resolved to actual tenantId by worker
-        threadKey: `slack:${team_id}:${event.channel}:${event.thread_ts ?? event.ts}`,
-        userMessage: event.text ?? '',
-        slack: {
-          teamId: team_id,
-          channelId: event.channel ?? '',
-          threadTs: event.thread_ts ?? event.ts ?? '',
-          userId: event.user ?? '',
-          botUserId: '', // Will be resolved by worker
-        },
-        enqueuedAt: new Date().toISOString(),
-      });
+      try {
+        await this.queueProducer.enqueueEnrichment({
+          tenantId: team_id, // resolved to actual tenantId by worker
+          threadKey: `slack:${team_id}:${event.channel}:${event.thread_ts ?? event.ts}`,
+          userMessage: event.text ?? '',
+          slack: {
+            teamId: team_id,
+            channelId: event.channel ?? '',
+            threadTs: event.thread_ts ?? event.ts ?? '',
+            userId: event.user ?? '',
+            botUserId: '', // Will be resolved by worker
+          },
+          enqueuedAt: new Date().toISOString(),
+        });
+        this.logger.log('Enrichment job enqueued successfully');
+      } catch (error) {
+        this.logger.error(`Failed to enqueue enrichment job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw error;
+      }
     }
 
     return { ok: true };
